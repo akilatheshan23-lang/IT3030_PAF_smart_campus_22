@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.vscode/
+.idea/
+*.iml
+backend/target/
+frontend/.vite/
+.env
