@@ -1,5 +1,6 @@
 package com.smartcampus.service;
 
+import com.smartcampus.dto.BookingRequest;
 import com.smartcampus.dto.BookingStatusUpdateRequest;
 import com.smartcampus.model.Booking;
 import com.smartcampus.model.BookingStatus;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -19,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class CampusService {
@@ -107,6 +110,72 @@ public class CampusService {
 
         booking.setStatus(target);
         booking.setDecisionReason(request.getReason());
+        return bookingRepository.save(booking);
+    }
+
+    public Booking createBooking(BookingRequest request) {
+        LocalDate bookingDate;
+        try {
+            bookingDate = LocalDate.parse(request.getBookingDate());
+        } catch (DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date format. Use YYYY-MM-DD.");
+        }
+
+        if (bookingDate.isBefore(LocalDate.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking date cannot be in the past.");
+        }
+
+        LocalTime start = parseTime(request.getStartTime());
+        LocalTime end = parseTime(request.getEndTime());
+
+        if (!start.isBefore(end)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End time must be after start time.");
+        }
+
+        Booking booking = new Booking();
+        booking.setBookingCode("BK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
+        booking.setRequesterName(request.getRequesterName());
+        booking.setRequesterEmail(request.getRequesterEmail());
+        booking.setResourceId(request.getResourceId());
+        booking.setResourceName(request.getResourceName());
+        booking.setBookingDate(request.getBookingDate());
+        booking.setStartTime(request.getStartTime());
+        booking.setEndTime(request.getEndTime());
+        booking.setPurpose(request.getPurpose());
+        booking.setAttendeeCount(request.getAttendeeCount());
+        booking.setStatus(BookingStatus.PENDING);
+        booking.setDecisionReason("");
+
+        if (hasConflict(booking)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Time conflict detected for this resource.");
+        }
+
+        return bookingRepository.save(booking);
+    }
+
+    public List<Booking> getUserBookings(String email) {
+        if (isBlank(email)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required to fetch bookings.");
+        }
+        return bookingRepository.findByRequesterEmailOrderByBookingDateDesc(email);
+    }
+
+    public Booking cancelUserBooking(String bookingId, String email) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found."));
+
+        if (!equalsIgnoreCase(booking.getRequesterEmail(), email)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to cancel this booking.");
+        }
+
+        if (booking.getStatus() == BookingStatus.REJECTED
+                || booking.getStatus() == BookingStatus.CANCELLED
+                || booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is already finalized.");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking.setDecisionReason("Cancelled by user.");
         return bookingRepository.save(booking);
     }
 

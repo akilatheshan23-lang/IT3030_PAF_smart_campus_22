@@ -9,4 +9,5 @@ import java.util.List;
 public interface BookingRepository extends MongoRepository<Booking, String> {
     long countByStatus(BookingStatus status);
     List<Booking> findByStatus(BookingStatus status);
+    List<Booking> findByRequesterEmailOrderByBookingDateDesc(String email);
 }

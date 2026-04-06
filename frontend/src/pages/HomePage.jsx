@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 
 export default function HomePage() {
@@ -58,6 +58,16 @@ export default function HomePage() {
     navigate('/admin')
   }
 
+  const goToUserDashboard = () => {
+    if (!localStorage.getItem('smart-campus-user-email')) {
+      const email = window.prompt('Enter your email to login:')
+      if (!email) return
+      localStorage.setItem('smart-campus-user-email', email)
+      localStorage.setItem('smart-campus-user-name', email.split('@')[0])
+    }
+    navigate('/dashboard')
+  }
+
   return (
     <div className="page-shell">
       <header className="hero-section">
@@ -73,7 +83,7 @@ export default function HomePage() {
           <div className="nav-links">
             <a href="#features">Features</a>
             <a href="#resources">Resources</a>
-            <Link to="/">Home</Link>
+            <button className="btn-secondary nav-btn" onClick={goToUserDashboard}>User Dashboard</button>
             <button className="btn-secondary nav-btn" onClick={goToAdmin}>Admin Panel</button>
           </div>
         </nav>
@@ -190,7 +200,7 @@ export default function HomePage() {
                   <span>Capacity: {resource.capacity}</span>
                   <span>{resource.availabilityWindow}</span>
                 </div>
-                <button className="btn-secondary full-width">View Details</button>
+                <button className="btn-secondary full-width" onClick={goToUserDashboard}>Book Now</button>
               </div>
             ))}
           </div>
