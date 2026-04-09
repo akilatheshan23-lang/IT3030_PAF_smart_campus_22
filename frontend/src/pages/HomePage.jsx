@@ -60,12 +60,10 @@ export default function HomePage() {
 
   const goToUserDashboard = () => {
     if (!localStorage.getItem('smart-campus-user-email')) {
-      const email = window.prompt('Enter your email to login:')
-      if (!email) return
-      localStorage.setItem('smart-campus-user-email', email)
-      localStorage.setItem('smart-campus-user-name', email.split('@')[0])
+      navigate('/login')
+    } else {
+      navigate('/dashboard')
     }
-    navigate('/dashboard')
   }
 
   return (

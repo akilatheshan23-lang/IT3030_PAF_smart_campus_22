@@ -58,7 +58,7 @@ export default function UserDashboard() {
       alert("Please provide a reason for cancellation.")
       return
     }
-    
+
     try {
       await campusApi.put(`/user/bookings/${cancelBookingId}/cancel?email=${userEmail}&reason=${encodeURIComponent(cancelReason)}`)
       loadBookings()
@@ -91,41 +91,62 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        <a href="#welcome">Welcome</a>
-        <a href="#upcoming">Upcoming</a>
-        <a href="#history">Booking History</a>
+        <div className="sidebar-nav-custom">
+          <a href="#welcome" className="nav-item">✧ Welcome</a>
+          <a href="#upcoming" className="nav-item">📅 Upcoming</a>
+          <a href="#history" className="nav-item">📜 History</a>
+        </div>
 
-        <div style={{ marginTop: 'auto' }}>
-          <button className="btn-secondary sidebar-btn" onClick={handleLogout}>Log Out</button>
+        <div style={{ marginTop: 'auto' }} className="sidebar-footer">
+          <div className="user-profile-sm">
+            <div className="avatar bg-gradient">{userName.charAt(0).toUpperCase()}</div>
+            <div className="profile-text">
+              <strong>{userName}</strong>
+              <span>{userEmail}</span>
+            </div>
+          </div>
+          <button className="btn-secondary sidebar-btn full-width" style={{ marginTop: '16px' }} onClick={handleLogout}>Log Out</button>
         </div>
       </aside>
 
       <main className="admin-main user-main">
         <section id="welcome" className="admin-header user-header glass-panel">
-          <div>
-            <span className="eyebrow">Welcome back,</span>
-            <h1>{userName}</h1>
-            <p>Manage your campus resource reservations, check availability, and request new bookings.</p>
+          <div className="hero-content-wrapper">
+            <span className="eyebrow fade-in">Welcome back,</span>
+            <h1 className="gradient-text slide-up">{userName}</h1>
+            <p className="delay-1">Manage your campus resource reservations, check availability, and request new bookings effortlessly.</p>
           </div>
-          <button className="btn-primary pulse-btn" onClick={() => setIsModalOpen(true)}>
-            + Book a Resource
-          </button>
+          <div className="hero-action delay-2">
+            <button className="btn-primary pulse-btn huge-btn" onClick={() => setIsModalOpen(true)}>
+              + Book a Resource
+            </button>
+          </div>
         </section>
 
         <section id="upcoming" className="user-section">
-          <h2>Upcoming Bookings</h2>
+          <div className="section-header-row">
+            <h2>Upcoming Bookings</h2>
+            <span className="badge counter-badge">{upcomingBookings.length} Active</span>
+          </div>
+
           {upcomingBookings.length === 0 ? (
-            <div className="empty-state custom-empty">You have no upcoming approved bookings.</div>
+            <div className="empty-state custom-empty glass-empty">
+              <span className="empty-icon">📭</span>
+              <p>You have no upcoming approved bookings.</p>
+              <button className="btn-secondary" style={{ marginTop: '16px' }} onClick={() => setIsModalOpen(true)}>Book Something</button>
+            </div>
           ) : (
-            <div className="resource-grid">
+            <div className="resource-grid premium-grid">
               {upcomingBookings.map(b => (
-                <div key={b.id} className="resource-card booking-card accent-green">
+                <div key={b.id} className="resource-card booking-card premium-booking accent-green">
                   <div className="resource-top">
-                    <span className="badge">{b.resourceName}</span>
-                    <span className="status approved">APPROVED</span>
+                    <span className="badge resource-badge">{b.resourceName}</span>
+                    <span className="status approved dot-status">APPROVED</span>
                   </div>
-                  <h3>{b.bookingDate}</h3>
-                  <p>{b.startTime} - {b.endTime}</p>
+                  <h3 className="booking-date">{b.bookingDate}</h3>
+                  <div className="booking-time-wrap">
+                    <p>⏱ {b.startTime} - {b.endTime}</p>
+                  </div>
                   <p className="purpose-text">"{b.purpose}"</p>
                   <button className="btn-danger full-width hover-lift" onClick={() => triggerCancel(b.id)}>Cancel Booking</button>
                 </div>
@@ -134,7 +155,7 @@ export default function UserDashboard() {
           )}
         </section>
 
-        <section id="history" className="user-section admin-panel-box">
+        <section id="history" className="user-section admin-panel-box glass-panel-soft">
           <div className="panel-top">
             <div>
               <span className="eyebrow">Your Activity</span>
@@ -143,16 +164,15 @@ export default function UserDashboard() {
             </div>
           </div>
 
-          {error && <p className="error-text">{error}</p>}
+          {error && <p className="error-text error-banner">{error}</p>}
 
-          <div className="table-wrap">
+          <div className="table-wrap premium-table-wrap">
             <table className="booking-table user-table">
               <thead>
                 <tr>
                   <th>Code</th>
                   <th>Resource</th>
-                  <th>Date</th>
-                  <th>Time</th>
+                  <th>Date & Time</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -160,25 +180,31 @@ export default function UserDashboard() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="6" className="empty-state">Loading...</td>
+                    <td colSpan="5" className="empty-state">
+                      <div className="loader"></div> Loading...
+                    </td>
                   </tr>
                 ) : historyBookings.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="empty-state">No booking history yet.</td>
+                    <td colSpan="5" className="empty-state">No booking history yet.</td>
                   </tr>
                 ) : (
                   historyBookings.map(b => (
-                    <tr key={b.id}>
-                      <td>{b.bookingCode}</td>
-                      <td>{b.resourceName}</td>
-                      <td>{b.bookingDate}</td>
-                      <td>{b.startTime} - {b.endTime}</td>
+                    <tr key={b.id} className="table-row-hover">
+                      <td className="font-mono">{b.bookingCode}</td>
+                      <td className="font-semibold">{b.resourceName}</td>
                       <td>
-                        <span className={`status ${String(b.status).toLowerCase()}`}>
+                        <div className="date-time-cell">
+                          <span className="t-date">{b.bookingDate}</span>
+                          <span className="t-time text-muted" style={{ display: 'block', fontSize: '0.85rem' }}>{b.startTime} - {b.endTime}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`status ${String(b.status).toLowerCase()} pill-status`}>
                           {b.status}
                         </span>
                         {b.decisionReason && (
-                          <span className="reason-tooltip" title={b.decisionReason}> ℹ️</span>
+                          <span className="reason-tooltip premium-tooltip" title={b.decisionReason}> ℹ️</span>
                         )}
                       </td>
                       <td>
@@ -214,12 +240,12 @@ export default function UserDashboard() {
         <div className="modal-overlay">
           <div className="modal-content popup-anim">
             <button className="close-btn" onClick={() => setCancelModalOpen(false)}>×</button>
-            <h2 style={{margin: '0 0 8px 0'}}>Cancel Booking</h2>
-            <p className="text-muted" style={{marginBottom: '20px', fontSize: '0.9rem'}}>Please provide a reason for cancellation.</p>
+            <h2 style={{ margin: '0 0 8px 0' }}>Cancel Booking</h2>
+            <p className="text-muted" style={{ marginBottom: '20px', fontSize: '0.9rem' }}>Please provide a reason for cancellation.</p>
             <div className="form-group">
               <label>Reason Type</label>
-              <select 
-                value={cancelReason} 
+              <select
+                value={cancelReason}
                 onChange={e => setCancelReason(e.target.value)}
                 required
               >
@@ -230,7 +256,7 @@ export default function UserDashboard() {
                 <option value="Other">Other</option>
               </select>
             </div>
-            <button className="btn-danger full-width" style={{marginTop: '24px'}} onClick={handleCancelConfirm}>
+            <button className="btn-danger full-width" style={{ marginTop: '24px' }} onClick={handleCancelConfirm}>
               Confirm Cancellation
             </button>
           </div>
