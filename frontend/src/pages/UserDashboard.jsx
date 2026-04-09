@@ -9,6 +9,9 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelBookingId, setCancelBookingId] = useState(null)
+  const [cancelReason, setCancelReason] = useState('')
   const navigate = useNavigate()
   const userEmail = localStorage.getItem('smart-campus-user-email') || 'student@example.com'
   const userName = localStorage.getItem('smart-campus-user-name') || 'Student'
@@ -43,11 +46,24 @@ export default function UserDashboard() {
     }
   }
 
-  const handleCancelBooking = async (bookingId) => {
-    if (!window.confirm('Are you sure you want to cancel this booking?')) return
+  const triggerCancel = (bookingId) => {
+    setCancelBookingId(bookingId)
+    setCancelReason('')
+    setCancelModalOpen(true)
+  }
+
+  const handleCancelConfirm = async () => {
+    if (!cancelBookingId) return
+    if (!cancelReason.trim()) {
+      alert("Please provide a reason for cancellation.")
+      return
+    }
+    
     try {
-      await campusApi.put(`/user/bookings/${bookingId}/cancel?email=${userEmail}`)
+      await campusApi.put(`/user/bookings/${cancelBookingId}/cancel?email=${userEmail}&reason=${encodeURIComponent(cancelReason)}`)
       loadBookings()
+      setCancelModalOpen(false)
+      setCancelBookingId(null)
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to cancel booking')
     }
@@ -111,7 +127,7 @@ export default function UserDashboard() {
                   <h3>{b.bookingDate}</h3>
                   <p>{b.startTime} - {b.endTime}</p>
                   <p className="purpose-text">"{b.purpose}"</p>
-                  <button className="btn-warning full-width" onClick={() => handleCancelBooking(b.id)}>Cancel</button>
+                  <button className="btn-danger full-width hover-lift" onClick={() => triggerCancel(b.id)}>Cancel Booking</button>
                 </div>
               ))}
             </div>
@@ -167,7 +183,7 @@ export default function UserDashboard() {
                       </td>
                       <td>
                         {(b.status === 'PENDING' || b.status === 'APPROVED') && (
-                          <button className="btn-warning small-btn" onClick={() => handleCancelBooking(b.id)}>
+                          <button className="btn-danger small-btn ghost-danger" onClick={() => triggerCancel(b.id)}>
                             Cancel
                           </button>
                         )}
@@ -192,6 +208,33 @@ export default function UserDashboard() {
           userEmail={userEmail}
           userName={userName}
         />
+      )}
+
+      {cancelModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content popup-anim">
+            <button className="close-btn" onClick={() => setCancelModalOpen(false)}>×</button>
+            <h2 style={{margin: '0 0 8px 0'}}>Cancel Booking</h2>
+            <p className="text-muted" style={{marginBottom: '20px', fontSize: '0.9rem'}}>Please provide a reason for cancellation.</p>
+            <div className="form-group">
+              <label>Reason Type</label>
+              <select 
+                value={cancelReason} 
+                onChange={e => setCancelReason(e.target.value)}
+                required
+              >
+                <option value="">Select a reason</option>
+                <option value="Schedule Conflict">Schedule Conflict</option>
+                <option value="No longer needed">No longer needed</option>
+                <option value="Booked wrong resource">Booked wrong resource</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <button className="btn-danger full-width" style={{marginTop: '24px'}} onClick={handleCancelConfirm}>
+              Confirm Cancellation
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

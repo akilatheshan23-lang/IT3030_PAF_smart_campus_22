@@ -36,7 +36,7 @@ public class UserController {
     }
 
     @PutMapping("/bookings/{id}/cancel")
-    public Booking cancelUserBooking(@PathVariable String id, @RequestParam String email) {
-        return campusService.cancelUserBooking(id, email);
+    public Booking cancelUserBooking(@PathVariable String id, @RequestParam String email, @RequestParam(required = false) String reason) {
+        return campusService.cancelUserBooking(id, email, reason);
     }
 }
