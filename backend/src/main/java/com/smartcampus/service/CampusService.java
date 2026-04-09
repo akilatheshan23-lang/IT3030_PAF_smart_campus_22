@@ -160,7 +160,7 @@ public class CampusService {
         return bookingRepository.findByRequesterEmailOrderByBookingDateDesc(email);
     }
 
-    public Booking cancelUserBooking(String bookingId, String email) {
+    public Booking cancelUserBooking(String bookingId, String email, String reason) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found."));
 
@@ -175,7 +175,8 @@ public class CampusService {
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
-        booking.setDecisionReason("Cancelled by user.");
+        String finalReason = (reason != null && !reason.isBlank()) ? "Cancelled by user: " + reason : "Cancelled by user.";
+        booking.setDecisionReason(finalReason);
         return bookingRepository.save(booking);
     }
 
