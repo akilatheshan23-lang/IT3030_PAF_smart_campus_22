@@ -774,6 +774,23 @@ a {
   box-shadow: 0 10px 24px rgba(109, 40, 217, 0.35);
 }
 
+.technician-layout {
+  background: linear-gradient(135deg, #f0fdf4, #ecfeff);
+}
+
+.technician-sidebar {
+  background: linear-gradient(180deg, #064e3b, #0f766e);
+}
+
+.technician-sidebar a:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.technician-mark {
+  background: linear-gradient(135deg, #34d399, #0ea5a4);
+  box-shadow: 0 10px 24px rgba(14, 165, 164, 0.35);
+}
+
 .user-header {
   border: 1px solid rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.7);

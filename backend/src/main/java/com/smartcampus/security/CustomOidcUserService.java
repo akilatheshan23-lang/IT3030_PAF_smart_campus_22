@@ -1,39 +1,40 @@
 package com.smartcampus.security;
 
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
-import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
-import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.stereotype.Service;
 import com.smartcampus.model.UserAccount;
 import com.smartcampus.model.UserRole;
 import com.smartcampus.service.UserAccountService;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.HashSet;
 
 @Service
-public class CustomOAuth2UserService extends DefaultOAuth2UserService {
+public class CustomOidcUserService extends OidcUserService {
 
     private final UserAccountService userAccountService;
 
-    public CustomOAuth2UserService(UserAccountService userAccountService) {
+    public CustomOidcUserService(UserAccountService userAccountService) {
         this.userAccountService = userAccountService;
     }
 
     @Override
-    public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
-        OAuth2User user = super.loadUser(userRequest);
+    public OidcUser loadUser(OidcUserRequest userRequest) throws OAuth2AuthenticationException {
+        OidcUser oidcUser = super.loadUser(userRequest);
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
         UserRole desiredRole = "google-technician".equalsIgnoreCase(registrationId)
                 ? UserRole.ROLE_TECHNICIAN
                 : UserRole.ROLE_USER;
-        UserAccount account = userAccountService.saveOrUpdateFromOAuth(user, desiredRole);
 
-        Collection<GrantedAuthority> authorities = new HashSet<>(user.getAuthorities());
+        UserAccount account = userAccountService.saveOrUpdateFromOAuth(oidcUser, desiredRole);
+
+        Collection<GrantedAuthority> authorities = new HashSet<>(oidcUser.getAuthorities());
         authorities.add(new SimpleGrantedAuthority(account.getRole().name()));
 
         String nameAttributeKey = userRequest.getClientRegistration()
@@ -41,6 +42,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 .getUserInfoEndpoint()
                 .getUserNameAttributeName();
 
-        return new DefaultOAuth2User(authorities, user.getAttributes(), nameAttributeKey);
+        return new DefaultOidcUser(authorities, oidcUser.getIdToken(), oidcUser.getUserInfo(), nameAttributeKey);
     }
 }

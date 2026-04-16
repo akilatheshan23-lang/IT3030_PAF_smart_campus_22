@@ -1,10 +1,15 @@
 import { Link } from 'react-router-dom'
 
 export default function SignupPage() {
-  const oauthUrl = import.meta.env.VITE_OAUTH_GOOGLE_URL || 'http://localhost:8080/oauth2/authorization/google'
+  const userOauthUrl = import.meta.env.VITE_OAUTH_USER_URL || 'http://localhost:8080/api/auth/google/user'
+  const technicianOauthUrl = import.meta.env.VITE_OAUTH_TECH_URL || 'http://localhost:8080/api/auth/google/technician'
 
-  const handleGoogleSignup = () => {
-    window.location.href = oauthUrl
+  const handleUserSignup = () => {
+    window.location.href = userOauthUrl
+  }
+
+  const handleTechnicianSignup = () => {
+    window.location.href = technicianOauthUrl
   }
 
   return (
@@ -19,14 +24,22 @@ export default function SignupPage() {
         </div>
         
         <h2 className="auth-title">Create Account</h2>
-        <p className="auth-subtitle">Use Google to join the SmartCampus network.</p>
+        <p className="auth-subtitle">Sign up with Google as a user or technician.</p>
 
         <button
           type="button"
           className="btn-primary full-width auth-btn"
-          onClick={handleGoogleSignup}
+          onClick={handleUserSignup}
         >
-          Sign up with Google
+          Sign up as User
+        </button>
+
+        <button
+          type="button"
+          className="btn-secondary full-width auth-btn auth-secondary-btn"
+          onClick={handleTechnicianSignup}
+        >
+          Sign up as Technician
         </button>
         
         <p className="auth-footer">

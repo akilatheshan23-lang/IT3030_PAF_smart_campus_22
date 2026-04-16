@@ -17,12 +17,25 @@ export default function UserDashboard() {
   const navigate = useNavigate()
   const userEmail = profile.email
   const userName = profile.name
+  const tickets = []
+  const notifications = []
 
   useEffect(() => {
     const initialize = async () => {
       try {
         const response = await campusApi.get('/auth/me')
         const { email, name, role } = response.data
+
+        if (role === 'ADMIN') {
+          navigate('/admin')
+          return
+        }
+
+        if (role === 'TECHNICIAN') {
+          navigate('/technician')
+          return
+        }
+
         localStorage.setItem('smart-campus-user-email', email)
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
@@ -102,6 +115,7 @@ export default function UserDashboard() {
     b => b.status === 'APPROVED' && new Date(`${b.bookingDate}T${b.endTime}`) >= new Date()
   )
   const historyBookings = bookings
+  const topResources = resources.slice(0, 3)
 
   if (authLoading) {
     return null
@@ -120,8 +134,11 @@ export default function UserDashboard() {
 
         <div className="sidebar-nav-custom">
           <a href="#welcome" className="nav-item">✧ Welcome</a>
+          <a href="#catalogue" className="nav-item">🏛 Catalogue</a>
           <a href="#upcoming" className="nav-item">📅 Upcoming</a>
           <a href="#history" className="nav-item">📜 History</a>
+          <a href="#tickets" className="nav-item">🧰 Tickets</a>
+          <a href="#notifications" className="nav-item">🔔 Notifications</a>
         </div>
 
         <div style={{ marginTop: 'auto' }} className="sidebar-footer">
@@ -141,13 +158,49 @@ export default function UserDashboard() {
           <div className="hero-content-wrapper">
             <span className="eyebrow fade-in">Welcome back,</span>
             <h1 className="gradient-text slide-up">{userName}</h1>
-            <p className="delay-1">Manage your campus resource reservations, check availability, and request new bookings effortlessly.</p>
+            <p className="delay-1">Manage resources, bookings, incident tickets, and notifications in one workspace.</p>
           </div>
           <div className="hero-action delay-2">
             <button className="btn-primary pulse-btn huge-btn" onClick={() => setIsModalOpen(true)}>
               + Book a Resource
             </button>
           </div>
+        </section>
+
+        <section id="catalogue" className="user-section admin-panel-box glass-panel-soft">
+          <div className="panel-top">
+            <div>
+              <span className="eyebrow">Module A</span>
+              <h2>Facilities & Assets Catalogue</h2>
+              <p>Preview bookable spaces and equipment with key metadata.</p>
+            </div>
+          </div>
+
+          {topResources.length === 0 ? (
+            <div className="empty-state custom-empty glass-empty">
+              <span className="empty-icon">🏛</span>
+              <p>No resources loaded yet.</p>
+            </div>
+          ) : (
+            <div className="resource-grid premium-grid">
+              {topResources.map(resource => (
+                <div key={resource.id} className="resource-card">
+                  <div className="resource-top">
+                    <span className="badge">{resource.type}</span>
+                    <span className={`status ${String(resource.status).toLowerCase()}`}>
+                      {resource.status}
+                    </span>
+                  </div>
+                  <h3>{resource.name}</h3>
+                  <p>{resource.location}</p>
+                  <div className="resource-meta">
+                    <span>Capacity: {resource.capacity}</span>
+                    <span>{resource.availabilityWindow}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section id="upcoming" className="user-section">
@@ -247,6 +300,56 @@ export default function UserDashboard() {
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section id="tickets" className="user-section admin-panel-box glass-panel-soft">
+          <div className="panel-top">
+            <div>
+              <span className="eyebrow">Module C</span>
+              <h2>Maintenance & Incident Tickets</h2>
+              <p>Track incident reports for your requested resources.</p>
+            </div>
+          </div>
+
+          {tickets.length === 0 ? (
+            <div className="empty-state custom-empty glass-empty">
+              <span className="empty-icon">🧰</span>
+              <p>No incident tickets yet.</p>
+            </div>
+          ) : (
+            <div className="alert-list">
+              {tickets.map(ticket => (
+                <div key={ticket.id} className="alert-item">
+                  {ticket.summary}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section id="notifications" className="user-section admin-panel-box glass-panel-soft">
+          <div className="panel-top">
+            <div>
+              <span className="eyebrow">Module D</span>
+              <h2>Notifications</h2>
+              <p>Stay updated on booking approvals and ticket status changes.</p>
+            </div>
+          </div>
+
+          {notifications.length === 0 ? (
+            <div className="empty-state custom-empty glass-empty">
+              <span className="empty-icon">🔔</span>
+              <p>No notifications yet.</p>
+            </div>
+          ) : (
+            <div className="alert-list">
+              {notifications.map((note, index) => (
+                <div key={index} className="alert-item">
+                  {note}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
 

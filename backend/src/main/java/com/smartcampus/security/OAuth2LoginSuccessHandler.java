@@ -24,8 +24,10 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                                         Authentication authentication) throws IOException, ServletException {
         boolean isAdmin = authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+        boolean isTechnician = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_TECHNICIAN".equals(authority.getAuthority()));
 
-        String targetPath = isAdmin ? "/admin" : "/dashboard";
+        String targetPath = isAdmin ? "/admin" : (isTechnician ? "/technician" : "/dashboard");
         String redirectUrl = frontendBaseUrl + "/login?oauth=success&next="
                 + URLEncoder.encode(targetPath, StandardCharsets.UTF_8);
 

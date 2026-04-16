@@ -8,7 +8,8 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const oauthUrl = import.meta.env.VITE_OAUTH_GOOGLE_URL || 'http://localhost:8080/oauth2/authorization/google'
+  const userOauthUrl = import.meta.env.VITE_OAUTH_USER_URL || 'http://localhost:8080/api/auth/google/user'
+  const technicianOauthUrl = import.meta.env.VITE_OAUTH_TECH_URL || 'http://localhost:8080/api/auth/google/technician'
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -34,7 +35,13 @@ export default function LoginPage() {
         return
       }
 
-      navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
+      if (role === 'ADMIN') {
+        navigate('/admin')
+      } else if (role === 'TECHNICIAN') {
+        navigate('/technician')
+      } else {
+        navigate('/dashboard')
+      }
     } catch (err) {
       setError('Unable to load your profile. Please try again.')
     } finally {
@@ -42,8 +49,25 @@ export default function LoginPage() {
     }
   }
 
-  const handleGoogleLogin = () => {
-    window.location.href = oauthUrl
+  const clearSessionAndRedirect = async (targetUrl) => {
+    try {
+      await campusApi.post('/auth/logout')
+    } catch (err) {
+      // Ignore logout errors and continue to login.
+    }
+
+    localStorage.removeItem('smart-campus-user-email')
+    localStorage.removeItem('smart-campus-user-name')
+    localStorage.removeItem('smart-campus-role')
+    window.location.href = targetUrl
+  }
+
+  const handleUserLogin = () => {
+    clearSessionAndRedirect(userOauthUrl)
+  }
+
+  const handleTechnicianLogin = () => {
+    clearSessionAndRedirect(technicianOauthUrl)
   }
 
   return (
@@ -58,26 +82,37 @@ export default function LoginPage() {
         </div>
         
         <h2 className="auth-title">Welcome Back</h2>
-        <p className="auth-subtitle">Sign in with your campus Google account.</p>
+        <p className="auth-subtitle">Choose how you want to sign in.</p>
 
         {error && <p className="error-text error-banner">{error}</p>}
 
         <button
           type="button"
           className="btn-primary full-width auth-btn"
-          onClick={handleGoogleLogin}
+          onClick={handleUserLogin}
           disabled={loading}
         >
-          {loading ? 'Checking session...' : 'Continue with Google'}
+          {loading ? 'Checking session...' : 'Continue as User'}
+        </button>
+
+        <button
+          type="button"
+          className="btn-secondary full-width auth-btn auth-secondary-btn"
+          onClick={handleTechnicianLogin}
+          disabled={loading}
+        >
+          Continue as Technician
         </button>
 
         <Link to="/signup" className="btn-secondary full-width auth-btn auth-secondary-btn">
           Create account
         </Link>
+
+        <Link to="/admin-login" className="btn-secondary full-width auth-btn auth-secondary-btn">
+          Admin login
+        </Link>
         
-        <p className="auth-footer">
-          Already have an account? Continue with Google above.
-        </p>
+        <p className="auth-footer">Use Google for user or technician access.</p>
       </div>
     </div>
   )

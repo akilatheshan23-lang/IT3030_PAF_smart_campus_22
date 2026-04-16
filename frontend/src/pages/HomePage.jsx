@@ -87,10 +87,10 @@ export default function HomePage() {
       if (response.data.role === 'ADMIN') {
         navigate('/admin')
       } else {
-        navigate('/login')
+        navigate('/admin-login')
       }
     } catch (error) {
-      navigate('/login')
+      navigate('/admin-login')
     }
   }
 
@@ -98,7 +98,13 @@ export default function HomePage() {
     try {
       const response = await campusApi.get('/auth/me')
       persistProfile(response.data)
-      navigate('/dashboard')
+      if (response.data.role === 'TECHNICIAN') {
+        navigate('/technician')
+      } else if (response.data.role === 'ADMIN') {
+        navigate('/admin')
+      } else {
+        navigate('/dashboard')
+      }
     } catch (error) {
       navigate('/login')
     }
@@ -152,7 +158,11 @@ export default function HomePage() {
               {authProfile ? (
                 <>
                   <span className="auth-status-role">
-                    {authProfile.role === 'ADMIN' ? 'Admin' : 'User'}
+                    {authProfile.role === 'ADMIN'
+                      ? 'Admin'
+                      : authProfile.role === 'TECHNICIAN'
+                        ? 'Technician'
+                        : 'User'}
                   </span>
                   <button className="btn-secondary" onClick={handleLogout}>Log out</button>
                 </>
