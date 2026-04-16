@@ -4,6 +4,8 @@ import campusApi from '../api/campusApi'
 import BookingModal from '../components/BookingModal'
 
 export default function UserDashboard() {
+  const [profile, setProfile] = useState({ email: '', name: '' })
+  const [authLoading, setAuthLoading] = useState(true)
   const [bookings, setBookings] = useState([])
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
@@ -13,22 +15,33 @@ export default function UserDashboard() {
   const [cancelBookingId, setCancelBookingId] = useState(null)
   const [cancelReason, setCancelReason] = useState('')
   const navigate = useNavigate()
-  const userEmail = localStorage.getItem('smart-campus-user-email') || 'student@example.com'
-  const userName = localStorage.getItem('smart-campus-user-name') || 'Student'
+  const userEmail = profile.email
+  const userName = profile.name
 
   useEffect(() => {
-    if (!localStorage.getItem('smart-campus-user-email')) {
-      localStorage.setItem('smart-campus-user-email', 'student@example.com')
-      localStorage.setItem('smart-campus-user-name', 'Student User')
+    const initialize = async () => {
+      try {
+        const response = await campusApi.get('/auth/me')
+        const { email, name, role } = response.data
+        localStorage.setItem('smart-campus-user-email', email)
+        localStorage.setItem('smart-campus-user-name', name)
+        localStorage.setItem('smart-campus-role', role)
+        setProfile({ email, name: name || email })
+        await Promise.all([loadBookings(), loadResources()])
+      } catch (err) {
+        navigate('/login')
+      } finally {
+        setAuthLoading(false)
+      }
     }
-    loadBookings()
-    loadResources()
+
+    initialize()
   }, [])
 
   const loadBookings = async () => {
     setLoading(true)
     try {
-      const response = await campusApi.get(`/user/bookings?email=${userEmail}`)
+      const response = await campusApi.get('/user/bookings')
       setBookings(response.data)
     } catch (err) {
       setError('Failed to load your bookings.')
@@ -60,7 +73,11 @@ export default function UserDashboard() {
     }
 
     try {
-      await campusApi.put(`/user/bookings/${cancelBookingId}/cancel?email=${userEmail}&reason=${encodeURIComponent(cancelReason)}`)
+      await campusApi.put(`/user/bookings/${cancelBookingId}/cancel`, null, {
+        params: {
+          reason: cancelReason
+        }
+      })
       loadBookings()
       setCancelModalOpen(false)
       setCancelBookingId(null)
@@ -69,9 +86,15 @@ export default function UserDashboard() {
     }
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await campusApi.post('/auth/logout')
+    } catch (err) {
+      console.error(err)
+    }
     localStorage.removeItem('smart-campus-user-email')
     localStorage.removeItem('smart-campus-user-name')
+    localStorage.removeItem('smart-campus-role')
     navigate('/')
   }
 
@@ -79,6 +102,10 @@ export default function UserDashboard() {
     b => b.status === 'APPROVED' && new Date(`${b.bookingDate}T${b.endTime}`) >= new Date()
   )
   const historyBookings = bookings
+
+  if (authLoading) {
+    return null
+  }
 
   return (
     <div className="admin-layout user-layout">

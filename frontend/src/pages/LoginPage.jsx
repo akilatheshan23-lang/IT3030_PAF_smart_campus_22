@@ -1,17 +1,49 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
+import campusApi from '../api/campusApi'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
+  const location = useLocation()
 
-  const handleLogin = (e) => {
-    e.preventDefault()
-    if (!email || !password) return
-    localStorage.setItem('smart-campus-user-email', email)
-    localStorage.setItem('smart-campus-user-name', email.split('@')[0])
-    navigate('/dashboard')
+  const oauthUrl = import.meta.env.VITE_OAUTH_GOOGLE_URL || 'http://localhost:8080/oauth2/authorization/google'
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('oauth') === 'success') {
+      resolveSession(params.get('next'))
+    } else if (params.get('oauth') === 'error') {
+      setError('Google sign-in failed. Please try again.')
+    }
+  }, [location.search])
+
+  const resolveSession = async (nextPath) => {
+    setLoading(true)
+    setError('')
+    try {
+      const response = await campusApi.get('/auth/me')
+      const { email, name, role } = response.data
+      localStorage.setItem('smart-campus-user-email', email)
+      localStorage.setItem('smart-campus-user-name', name)
+      localStorage.setItem('smart-campus-role', role)
+
+      if (nextPath) {
+        navigate(nextPath)
+        return
+      }
+
+      navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
+    } catch (err) {
+      setError('Unable to load your profile. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleLogin = () => {
+    window.location.href = oauthUrl
   }
 
   return (
@@ -26,35 +58,25 @@ export default function LoginPage() {
         </div>
         
         <h2 className="auth-title">Welcome Back</h2>
-        <p className="auth-subtitle">Sign in to manage your bookings and resources.</p>
-        
-        <form onSubmit={handleLogin} className="booking-form auth-form">
-          <div className="form-group">
-            <label>Email Address</label>
-            <input 
-              type="email" 
-              required 
-              placeholder="student@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label>Password</label>
-            <input 
-              type="password" 
-              required 
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-            />
-          </div>
-          
-          <button type="submit" className="btn-primary full-width auth-btn">Sign In</button>
-        </form>
+        <p className="auth-subtitle">Sign in with your campus Google account.</p>
+
+        {error && <p className="error-text error-banner">{error}</p>}
+
+        <button
+          type="button"
+          className="btn-primary full-width auth-btn"
+          onClick={handleGoogleLogin}
+          disabled={loading}
+        >
+          {loading ? 'Checking session...' : 'Continue with Google'}
+        </button>
+
+        <Link to="/signup" className="btn-secondary full-width auth-btn auth-secondary-btn">
+          Create account
+        </Link>
         
         <p className="auth-footer">
-          Don't have an account? <Link to="/signup" className="auth-link">Create Account</Link>
+          Already have an account? Continue with Google above.
         </p>
       </div>
     </div>

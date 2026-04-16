@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 
 export default function HomePage() {
+  const [authProfile, setAuthProfile] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [overview, setOverview] = useState(null)
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
@@ -16,6 +18,7 @@ export default function HomePage() {
   useEffect(() => {
     loadOverview()
     loadResources()
+    loadAuthProfile()
   }, [])
 
   const loadOverview = async () => {
@@ -53,17 +56,64 @@ export default function HomePage() {
     loadResources(filters)
   }
 
-  const goToAdmin = () => {
-    localStorage.setItem('smart-campus-role', 'ADMIN')
-    navigate('/admin')
+  const persistProfile = (profile) => {
+    if (!profile) return
+    localStorage.setItem('smart-campus-user-email', profile.email)
+    localStorage.setItem('smart-campus-user-name', profile.name || profile.email)
+    localStorage.setItem('smart-campus-role', profile.role)
   }
 
-  const goToUserDashboard = () => {
-    if (!localStorage.getItem('smart-campus-user-email')) {
-      navigate('/login')
-    } else {
-      navigate('/dashboard')
+  const loadAuthProfile = async () => {
+    try {
+      const response = await campusApi.get('/auth/me')
+      const profile = response.data
+      persistProfile(profile)
+      setAuthProfile({
+        ...profile,
+        name: profile.name || profile.email
+      })
+    } catch (error) {
+      setAuthProfile(null)
+    } finally {
+      setAuthLoading(false)
     }
+  }
+
+  const goToAdmin = async () => {
+    try {
+      const response = await campusApi.get('/auth/me')
+      persistProfile(response.data)
+
+      if (response.data.role === 'ADMIN') {
+        navigate('/admin')
+      } else {
+        navigate('/login')
+      }
+    } catch (error) {
+      navigate('/login')
+    }
+  }
+
+  const goToUserDashboard = async () => {
+    try {
+      const response = await campusApi.get('/auth/me')
+      persistProfile(response.data)
+      navigate('/dashboard')
+    } catch (error) {
+      navigate('/login')
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await campusApi.post('/auth/logout')
+    } catch (error) {
+      console.error(error)
+    }
+    localStorage.removeItem('smart-campus-user-email')
+    localStorage.removeItem('smart-campus-user-name')
+    localStorage.removeItem('smart-campus-role')
+    setAuthProfile(null)
   }
 
   return (
@@ -85,6 +135,33 @@ export default function HomePage() {
             <button className="btn-secondary nav-btn" onClick={goToAdmin}>Admin Panel</button>
           </div>
         </nav>
+
+        {!authLoading && (
+          <div className="auth-status-banner glass-panel">
+            <div>
+              <div className="auth-status-title">
+                {authProfile ? 'Signed in' : 'Guest mode'}
+              </div>
+              <div className="auth-status-meta">
+                {authProfile
+                  ? `Signed in as ${authProfile.name} (${authProfile.email})`
+                  : 'Sign in to manage bookings and access dashboards.'}
+              </div>
+            </div>
+            <div className="auth-status-actions">
+              {authProfile ? (
+                <>
+                  <span className="auth-status-role">
+                    {authProfile.role === 'ADMIN' ? 'Admin' : 'User'}
+                  </span>
+                  <button className="btn-secondary" onClick={handleLogout}>Log out</button>
+                </>
+              ) : (
+                <button className="btn-primary" onClick={() => navigate('/login')}>Sign in</button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="hero-content container">
           <div className="hero-text">

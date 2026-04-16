@@ -74,6 +74,50 @@
   color: var(--primary-dark);
 }
 
+.auth-secondary-btn {
+  margin-top: 12px;
+}
+
+.auth-status-banner {
+  width: min(1180px, 92%);
+  margin: 12px auto 0;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+}
+
+.auth-status-title {
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.auth-status-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.auth-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.auth-status-role {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--primary-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 * {
   box-sizing: border-box;
 }

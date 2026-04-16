@@ -78,8 +78,15 @@ export default function AdminPanel() {
     }
   }
 
-  const logoutAdmin = () => {
+  const logoutAdmin = async () => {
+    try {
+      await campusApi.post('/auth/logout')
+    } catch (err) {
+      console.error(err)
+    }
     localStorage.removeItem('smart-campus-role')
+    localStorage.removeItem('smart-campus-user-email')
+    localStorage.removeItem('smart-campus-user-name')
     navigate('/')
   }
 
