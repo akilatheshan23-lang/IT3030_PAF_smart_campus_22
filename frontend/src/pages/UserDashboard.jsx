@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 import BookingModal from '../components/BookingModal'
+import ReportIssueModal from '../components/ReportIssueModal'
 
 export default function UserDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
@@ -14,10 +15,11 @@ export default function UserDashboard() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelBookingId, setCancelBookingId] = useState(null)
   const [cancelReason, setCancelReason] = useState('')
+  const [tickets, setTickets] = useState([])
+  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false)
   const navigate = useNavigate()
   const userEmail = profile.email
   const userName = profile.name
-  const tickets = []
   const notifications = []
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export default function UserDashboard() {
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
         setProfile({ email, name: name || email })
-        await Promise.all([loadBookings(), loadResources()])
+        await Promise.all([loadBookings(), loadResources(), loadTickets()])
       } catch (err) {
         navigate('/login')
       } finally {
@@ -69,6 +71,25 @@ export default function UserDashboard() {
       setResources(response.data)
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  const loadTickets = async () => {
+    try {
+      const response = await campusApi.get('/user/tickets')
+      setTickets(response.data)
+    } catch (err) {
+      console.error('Failed to load tickets', err)
+    }
+  }
+
+  const handleReportIssue = async (issueData) => {
+    try {
+      await campusApi.post('/user/tickets', issueData)
+      setIsIssueModalOpen(false)
+      loadTickets()
+    } catch (err) {
+      alert('Failed to submit issue report.')
     }
   }
 
@@ -160,9 +181,12 @@ export default function UserDashboard() {
             <h1 className="gradient-text slide-up">{userName}</h1>
             <p className="delay-1">Manage resources, bookings, incident tickets, and notifications in one workspace.</p>
           </div>
-          <div className="hero-action delay-2">
+          <div className="hero-action delay-2" style={{ display: 'flex', gap: '12px' }}>
             <button className="btn-primary pulse-btn huge-btn" onClick={() => setIsModalOpen(true)}>
               + Book a Resource
+            </button>
+            <button className="btn-secondary huge-btn auth-secondary-btn" onClick={() => setIsIssueModalOpen(true)}>
+              Report Issue
             </button>
           </div>
         </section>
@@ -317,10 +341,21 @@ export default function UserDashboard() {
               <p>No incident tickets yet.</p>
             </div>
           ) : (
-            <div className="alert-list">
+            <div className="resource-grid premium-grid">
               {tickets.map(ticket => (
-                <div key={ticket.id} className="alert-item">
-                  {ticket.summary}
+                <div key={ticket.id} className="resource-card booking-card">
+                  <div className="resource-top">
+                    <span className="badge">{ticket.ticketCode}</span>
+                    <span className={`status ${String(ticket.status).toLowerCase()} dot-status`}>
+                      {ticket.status}
+                    </span>
+                  </div>
+                  <h3 style={{ margin: '14px 0 6px 0', fontSize: '1.05rem' }}>{ticket.category} Update</h3>
+                  <div className="resource-meta" style={{ marginTop: '4px' }}>
+                    <span style={{ fontSize: '0.85rem' }}>Priority: <strong style={{ color: ticket.priority === 'HIGH' ? 'var(--danger)' : 'inherit' }}>{ticket.priority}</strong></span>
+                    <span style={{ fontSize: '0.85rem' }}>Loc: {ticket.resourceId || ticket.location}</span>
+                  </div>
+                  <p className="purpose-text" style={{ fontSize: '0.9rem', color: 'var(--text)' }}>"{ticket.description}"</p>
                 </div>
               ))}
             </div>
@@ -363,6 +398,13 @@ export default function UserDashboard() {
           resources={resources}
           userEmail={userEmail}
           userName={userName}
+        />
+      )}
+
+      {isIssueModalOpen && (
+        <ReportIssueModal
+          onClose={() => setIsIssueModalOpen(false)}
+          onSubmit={handleReportIssue}
         />
       )}
 

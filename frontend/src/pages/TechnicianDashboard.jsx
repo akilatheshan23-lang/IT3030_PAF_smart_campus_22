@@ -5,9 +5,9 @@ import campusApi from '../api/campusApi'
 export default function TechnicianDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
   const [authLoading, setAuthLoading] = useState(true)
+  const [assignedTickets, setAssignedTickets] = useState([])
   const navigate = useNavigate()
 
-  const assignedTickets = []
   const notifications = []
 
   useEffect(() => {
@@ -30,6 +30,7 @@ export default function TechnicianDashboard() {
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
         setProfile({ email, name: name || email })
+        await loadTickets()
       } catch (err) {
         navigate('/login')
       } finally {
@@ -39,6 +40,26 @@ export default function TechnicianDashboard() {
 
     initialize()
   }, [])
+
+  const loadTickets = async () => {
+    try {
+      const response = await campusApi.get('/technician/tickets')
+      setAssignedTickets(response.data)
+    } catch (err) {
+      console.error('Failed to load tickets', err)
+    }
+  }
+
+  const handleUpdateStatus = async (id, newStatus) => {
+    try {
+      await campusApi.put(`/technician/tickets/${id}/status`, null, {
+        params: { status: newStatus }
+      })
+      loadTickets()
+    } catch (err) {
+      alert('Failed to update ticket status')
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -142,16 +163,33 @@ export default function TechnicianDashboard() {
               <tbody>
                 {assignedTickets.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="empty-state">No tickets assigned yet.</td>
+                    <td colSpan="5" className="empty-state">No tickets assigned or open.</td>
                   </tr>
                 ) : (
                   assignedTickets.map(ticket => (
-                    <tr key={ticket.id}>
-                      <td>{ticket.code}</td>
-                      <td>{ticket.resource}</td>
-                      <td>{ticket.priority}</td>
-                      <td>{ticket.status}</td>
-                      <td>{ticket.updatedAt}</td>
+                    <tr key={ticket.id} className="table-row-hover">
+                      <td className="font-mono"><strong>{ticket.ticketCode}</strong><br/><span style={{fontSize: '0.85rem', color: 'var(--muted)'}}>{ticket.category}</span></td>
+                      <td>{ticket.resourceId || ticket.location}</td>
+                      <td>
+                        <span style={{color: ticket.priority === 'HIGH' ? 'var(--danger)' : ticket.priority === 'MEDIUM' ? 'var(--warning)' : 'inherit', fontWeight: 'bold'}}>
+                          {ticket.priority}
+                        </span>
+                      </td>
+                      <td>
+                        <select 
+                          className={`status ${String(ticket.status).toLowerCase()} pill-status`} 
+                          value={ticket.status} 
+                          onChange={(e) => handleUpdateStatus(ticket.id, e.target.value)}
+                          style={{ border: 'none', appearance: 'none', cursor: 'pointer', paddingRight: '20px' }}
+                        >
+                          <option value="OPEN">OPEN</option>
+                          <option value="IN_PROGRESS">IN_PROGRESS</option>
+                          <option value="RESOLVED">RESOLVED</option>
+                          <option value="CLOSED">CLOSED</option>
+                        </select>
+                        <span style={{marginLeft: '-15px', pointerEvents: 'none', fontSize: '0.7rem'}}>▼</span>
+                      </td>
+                      <td>{new Date(ticket.updatedAt).toLocaleDateString()}</td>
                     </tr>
                   ))
                 )}
