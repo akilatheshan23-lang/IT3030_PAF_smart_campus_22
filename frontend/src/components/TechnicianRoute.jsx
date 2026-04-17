@@ -2,16 +2,11 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 
-export default function AdminRoute({ children }) {
-  const [role, setRole] = useState(localStorage.getItem('smart-campus-role'))
-  const [loading, setLoading] = useState(!role)
+export default function TechnicianRoute({ children }) {
+  const [role, setRole] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (role) {
-      setLoading(false)
-      return
-    }
-
     const loadProfile = async () => {
       try {
         const response = await campusApi.get('/auth/me')
@@ -28,14 +23,14 @@ export default function AdminRoute({ children }) {
     }
 
     loadProfile()
-  }, [role])
+  }, [])
 
   if (loading) {
     return null
   }
 
-  if (role !== 'ADMIN') {
-    return <Navigate to="/admin-login" replace />
+  if (role !== 'TECHNICIAN') {
+    return <Navigate to="/login" replace />
   }
 
   return children

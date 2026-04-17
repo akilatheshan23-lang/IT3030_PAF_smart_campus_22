@@ -7,3 +7,4 @@ coverage/
 backend/target/
 frontend/.vite/
 .env
+backend/.env.properties
