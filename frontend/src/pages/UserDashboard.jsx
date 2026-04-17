@@ -181,12 +181,9 @@ export default function UserDashboard() {
             <h1 className="gradient-text slide-up">{userName}</h1>
             <p className="delay-1">Manage resources, bookings, incident tickets, and notifications in one workspace.</p>
           </div>
-          <div className="hero-action delay-2" style={{ display: 'flex', gap: '12px' }}>
+          <div className="hero-action delay-2">
             <button className="btn-primary pulse-btn huge-btn" onClick={() => setIsModalOpen(true)}>
               + Book a Resource
-            </button>
-            <button className="btn-secondary huge-btn auth-secondary-btn" onClick={() => setIsIssueModalOpen(true)}>
-              Report Issue
             </button>
           </div>
         </section>
@@ -327,12 +324,15 @@ export default function UserDashboard() {
         </section>
 
         <section id="tickets" className="user-section admin-panel-box glass-panel-soft">
-          <div className="panel-top">
+          <div className="panel-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <span className="eyebrow">Module C</span>
               <h2>Maintenance & Incident Tickets</h2>
               <p>Track incident reports for your requested resources.</p>
             </div>
+            <button className="btn-secondary auth-secondary-btn" onClick={() => setIsIssueModalOpen(true)}>
+              Report Issue
+            </button>
           </div>
 
           {tickets.length === 0 ? (
