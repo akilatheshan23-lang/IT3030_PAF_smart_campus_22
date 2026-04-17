@@ -73,7 +73,7 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
+      <div className="auth-card popup-anim">
         <div className="brand-wrap center-brand">
           <div className="brand-mark">SC</div>
           <div>
@@ -117,7 +117,7 @@ export default function LoginPage() {
           Admin login
         </Link>
         
-        <p className="auth-footer">Use Google for user or technician access.</p>
+        <p className="auth-footer" style={{ marginTop: '30px' }}>Use Google for user or technician access.</p>
       </div>
     </div>
   )
