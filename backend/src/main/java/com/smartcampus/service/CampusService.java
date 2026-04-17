@@ -2,6 +2,7 @@ package com.smartcampus.service;
 
 import com.smartcampus.dto.BookingRequest;
 import com.smartcampus.dto.BookingStatusUpdateRequest;
+import com.smartcampus.dto.ResourceCreateRequest;
 import com.smartcampus.model.Booking;
 import com.smartcampus.model.BookingStatus;
 import com.smartcampus.model.Resource;
@@ -14,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,6 +27,8 @@ import java.util.UUID;
 
 @Service
 public class CampusService {
+
+    private static final DateTimeFormatter HH_MM_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
     private final ResourceRepository resourceRepository;
     private final BookingRepository bookingRepository;
@@ -79,6 +83,31 @@ public class CampusService {
                 .filter(booking -> isBlank(bookingDate) || bookingDate.equals(booking.getBookingDate()))
                 .sorted(Comparator.comparing(Booking::getBookingDate).reversed().thenComparing(Booking::getStartTime))
                 .toList();
+    }
+
+    public Resource createResource(ResourceCreateRequest request) {
+        String name = normalize(request.getName());
+        String type = normalize(request.getType());
+        String location = normalize(request.getLocation());
+        String availabilityWindow = normalizeAvailabilityWindow(request.getAvailabilityWindow());
+        ResourceStatus status = request.getStatus() != null ? request.getStatus() : ResourceStatus.ACTIVE;
+
+        boolean duplicateExists = resourceRepository
+                .existsByNameIgnoreCaseAndTypeIgnoreCaseAndLocationIgnoreCase(name, type, location);
+
+        if (duplicateExists) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "A resource with the same name, type, and location already exists.");
+        }
+
+        Resource resource = new Resource();
+        resource.setName(name);
+        resource.setType(type);
+        resource.setCapacity(request.getCapacity());
+        resource.setLocation(location);
+        resource.setAvailabilityWindow(availabilityWindow);
+        resource.setStatus(status);
+        return resourceRepository.save(resource);
     }
 
     public Booking updateBookingStatus(String bookingId, BookingStatusUpdateRequest request) {
@@ -224,5 +253,31 @@ public class CampusService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String normalize(String value) {
+        return value == null ? null : value.trim().replaceAll("\\s+", " ");
+    }
+
+    private String normalizeAvailabilityWindow(String value) {
+        if (isBlank(value)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Availability window is required.");
+        }
+
+        String[] parts = value.split("-");
+        if (parts.length != 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid availability window format. Use HH:mm - HH:mm.");
+        }
+
+        LocalTime start = parseTime(parts[0].trim());
+        LocalTime end = parseTime(parts[1].trim());
+
+        if (!start.isBefore(end)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Availability window end time must be after start time.");
+        }
+
+        return start.format(HH_MM_FORMAT) + " - " + end.format(HH_MM_FORMAT);
     }
 }
