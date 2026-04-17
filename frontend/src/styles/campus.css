@@ -717,6 +717,16 @@ a {
   margin-bottom: 12px;
 }
 
+.success-text {
+  margin: -8px 0 16px;
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
 @media (max-width: 1100px) {
   .hero-content,
   .admin-layout {
@@ -1055,4 +1065,42 @@ a {
 .small-btn {
   padding: 6px 12px;
   font-size: 0.8rem;
+}
+
+.resource-modal {
+  max-width: 700px;
+}
+
+.resource-modal-subtitle {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+
+.resource-form {
+  margin-top: 16px;
+}
+
+.resource-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.input-error {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+@media (max-width: 768px) {
+  .resource-form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
 }

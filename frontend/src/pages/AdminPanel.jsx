@@ -2,10 +2,26 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 
+const initialResourceForm = {
+  name: '',
+  type: 'Lecture Hall',
+  capacity: '',
+  location: '',
+  startTime: '08:00',
+  endTime: '18:00',
+  status: 'ACTIVE'
+}
+
 export default function AdminPanel() {
   const [summary, setSummary] = useState(null)
   const [bookings, setBookings] = useState([])
   const [error, setError] = useState('')
+  const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
+  const [resourceForm, setResourceForm] = useState(initialResourceForm)
+  const [resourceErrors, setResourceErrors] = useState({})
+  const [resourceSubmitError, setResourceSubmitError] = useState('')
+  const [resourceSubmitSuccess, setResourceSubmitSuccess] = useState('')
+  const [isCreatingResource, setIsCreatingResource] = useState(false)
   const [filters, setFilters] = useState({
     status: '',
     resource: '',
@@ -17,6 +33,21 @@ export default function AdminPanel() {
     loadSummary()
     loadBookings()
   }, [])
+
+  useEffect(() => {
+    if (!isResourceModalOpen) {
+      return undefined
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsResourceModalOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isResourceModalOpen])
 
   const loadSummary = async () => {
     try {
@@ -53,6 +84,127 @@ export default function AdminPanel() {
   const handleFilterSubmit = (event) => {
     event.preventDefault()
     loadBookings(filters)
+  }
+
+  const openResourceModal = () => {
+    setResourceForm(initialResourceForm)
+    setResourceErrors({})
+    setResourceSubmitError('')
+    setIsResourceModalOpen(true)
+  }
+
+  const closeResourceModal = () => {
+    if (isCreatingResource) {
+      return
+    }
+    setIsResourceModalOpen(false)
+  }
+
+  const handleResourceInputChange = (event) => {
+    const { name, value } = event.target
+
+    setResourceForm((previous) => ({
+      ...previous,
+      [name]: value
+    }))
+
+    setResourceErrors((previous) => {
+      if (!previous[name]) {
+        return previous
+      }
+      const next = { ...previous }
+      delete next[name]
+      return next
+    })
+
+    if (resourceSubmitError) {
+      setResourceSubmitError('')
+    }
+  }
+
+  const validateResourceForm = () => {
+    const nextErrors = {}
+    const normalizedName = resourceForm.name.trim()
+    const normalizedType = resourceForm.type.trim()
+    const normalizedLocation = resourceForm.location.trim()
+    const capacityValue = Number(resourceForm.capacity)
+
+    if (!normalizedName) {
+      nextErrors.name = 'Resource name is required.'
+    } else if (normalizedName.length > 120) {
+      nextErrors.name = 'Resource name must be at most 120 characters.'
+    }
+
+    if (!normalizedType) {
+      nextErrors.type = 'Resource type is required.'
+    } else if (normalizedType.length > 80) {
+      nextErrors.type = 'Resource type must be at most 80 characters.'
+    }
+
+    if (!normalizedLocation) {
+      nextErrors.location = 'Location is required.'
+    } else if (normalizedLocation.length > 120) {
+      nextErrors.location = 'Location must be at most 120 characters.'
+    }
+
+    if (!resourceForm.capacity) {
+      nextErrors.capacity = 'Capacity is required.'
+    } else if (!Number.isInteger(capacityValue) || capacityValue <= 0) {
+      nextErrors.capacity = 'Capacity must be a positive whole number.'
+    }
+
+    if (!resourceForm.startTime) {
+      nextErrors.startTime = 'Start time is required.'
+    }
+
+    if (!resourceForm.endTime) {
+      nextErrors.endTime = 'End time is required.'
+    }
+
+    if (resourceForm.startTime && resourceForm.endTime && resourceForm.startTime >= resourceForm.endTime) {
+      nextErrors.endTime = 'End time must be later than start time.'
+    }
+
+    if (!['ACTIVE', 'OUT_OF_SERVICE'].includes(resourceForm.status)) {
+      nextErrors.status = 'Select a valid resource status.'
+    }
+
+    setResourceErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  const handleCreateResource = async (event) => {
+    event.preventDefault()
+
+    if (!validateResourceForm()) {
+      return
+    }
+
+    setResourceSubmitError('')
+    setResourceSubmitSuccess('')
+    setIsCreatingResource(true)
+
+    const payload = {
+      name: resourceForm.name.trim(),
+      type: resourceForm.type.trim(),
+      capacity: Number(resourceForm.capacity),
+      location: resourceForm.location.trim(),
+      availabilityWindow: `${resourceForm.startTime} - ${resourceForm.endTime}`,
+      status: resourceForm.status
+    }
+
+    try {
+      await campusApi.post('/admin/resources', payload)
+      setIsResourceModalOpen(false)
+      setResourceForm(initialResourceForm)
+      setResourceErrors({})
+      setResourceSubmitSuccess(`Resource "${payload.name}" added successfully.`)
+      await loadSummary()
+    } catch (err) {
+      setResourceSubmitError(err?.response?.data?.message || 'Failed to create resource.')
+    } finally {
+      setIsCreatingResource(false)
+    }
   }
 
   const handleStatusUpdate = async (bookingId, status) => {
@@ -114,8 +266,10 @@ export default function AdminPanel() {
             <h1>Smart Campus Dashboard</h1>
             <p>Monitor requests, review bookings, and keep the system organized from one premium admin interface.</p>
           </div>
-          <button className="btn-primary">+ Add New Resource</button>
+          <button className="btn-primary" type="button" onClick={openResourceModal}>+ Add New Resource</button>
         </section>
+
+        {resourceSubmitSuccess && <p className="success-text">{resourceSubmitSuccess}</p>}
 
         <section className="summary-grid">
           <div className="summary-card accent-blue">
@@ -272,6 +426,148 @@ export default function AdminPanel() {
           </div>
         </section>
       </main>
+
+      {isResourceModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeResourceModal()
+            }
+          }}
+        >
+          <div className="modal-content glass-panel popup-anim resource-modal" role="dialog" aria-modal="true" aria-labelledby="resource-modal-title">
+            <h2 id="resource-modal-title">Add New Resource</h2>
+            <button className="close-btn" type="button" onClick={closeResourceModal} aria-label="Close add resource form">&times;</button>
+            <p className="resource-modal-subtitle">Create lecture halls, projectors, labs, and other university facilities.</p>
+
+            {resourceSubmitError && <div className="error-banner">{resourceSubmitError}</div>}
+
+            <form onSubmit={handleCreateResource} className="booking-form resource-form">
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="resourceName">Resource Name</label>
+                  <input
+                    id="resourceName"
+                    type="text"
+                    name="name"
+                    placeholder="Main Lecture Hall A"
+                    value={resourceForm.name}
+                    onChange={handleResourceInputChange}
+                    className={resourceErrors.name ? 'input-error' : ''}
+                    maxLength={120}
+                  />
+                  {resourceErrors.name && <span className="field-error">{resourceErrors.name}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="resourceType">Type</label>
+                  <select
+                    id="resourceType"
+                    name="type"
+                    value={resourceForm.type}
+                    onChange={handleResourceInputChange}
+                    className={resourceErrors.type ? 'input-error' : ''}
+                  >
+                    <option value="Lecture Hall">Lecture Hall</option>
+                    <option value="Projector">Projector</option>
+                    <option value="Lab">Lab</option>
+                    <option value="Meeting Room">Meeting Room</option>
+                    <option value="Equipment">Equipment</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  {resourceErrors.type && <span className="field-error">{resourceErrors.type}</span>}
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="resourceCapacity">Capacity</label>
+                  <input
+                    id="resourceCapacity"
+                    type="number"
+                    name="capacity"
+                    min="1"
+                    step="1"
+                    placeholder="100"
+                    value={resourceForm.capacity}
+                    onChange={handleResourceInputChange}
+                    className={resourceErrors.capacity ? 'input-error' : ''}
+                  />
+                  {resourceErrors.capacity && <span className="field-error">{resourceErrors.capacity}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="resourceStatus">Status</label>
+                  <select
+                    id="resourceStatus"
+                    name="status"
+                    value={resourceForm.status}
+                    onChange={handleResourceInputChange}
+                    className={resourceErrors.status ? 'input-error' : ''}
+                  >
+                    <option value="ACTIVE">Active</option>
+                    <option value="OUT_OF_SERVICE">Out of service</option>
+                  </select>
+                  {resourceErrors.status && <span className="field-error">{resourceErrors.status}</span>}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="resourceLocation">Location</label>
+                <input
+                  id="resourceLocation"
+                  type="text"
+                  name="location"
+                  placeholder="Block A"
+                  value={resourceForm.location}
+                  onChange={handleResourceInputChange}
+                  className={resourceErrors.location ? 'input-error' : ''}
+                  maxLength={120}
+                />
+                {resourceErrors.location && <span className="field-error">{resourceErrors.location}</span>}
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="resourceStartTime">Available From (HH:MM)</label>
+                  <input
+                    id="resourceStartTime"
+                    type="time"
+                    name="startTime"
+                    value={resourceForm.startTime}
+                    onChange={handleResourceInputChange}
+                    className={resourceErrors.startTime ? 'input-error' : ''}
+                  />
+                  {resourceErrors.startTime && <span className="field-error">{resourceErrors.startTime}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="resourceEndTime">Available To (HH:MM)</label>
+                  <input
+                    id="resourceEndTime"
+                    type="time"
+                    name="endTime"
+                    value={resourceForm.endTime}
+                    onChange={handleResourceInputChange}
+                    className={resourceErrors.endTime ? 'input-error' : ''}
+                  />
+                  {resourceErrors.endTime && <span className="field-error">{resourceErrors.endTime}</span>}
+                </div>
+              </div>
+
+              <div className="resource-form-actions">
+                <button type="button" className="btn-secondary" onClick={closeResourceModal} disabled={isCreatingResource}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={isCreatingResource}>
+                  {isCreatingResource ? 'Creating...' : 'Create Resource'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
