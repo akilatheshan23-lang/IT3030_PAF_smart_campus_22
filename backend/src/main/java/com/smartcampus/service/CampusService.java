@@ -1,18 +1,5 @@
 package com.smartcampus.service;
 
-import com.smartcampus.dto.BookingRequest;
-import com.smartcampus.dto.BookingStatusUpdateRequest;
-import com.smartcampus.dto.ResourceCreateRequest;
-import com.smartcampus.model.Booking;
-import com.smartcampus.model.BookingStatus;
-import com.smartcampus.model.Resource;
-import com.smartcampus.model.ResourceStatus;
-import com.smartcampus.repository.BookingRepository;
-import com.smartcampus.repository.ResourceRepository;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -24,6 +11,21 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import com.smartcampus.dto.BookingRequest;
+import com.smartcampus.dto.BookingStatusUpdateRequest;
+import com.smartcampus.dto.ResourceCreateRequest;
+import com.smartcampus.dto.ResourceUpdateRequest;
+import com.smartcampus.model.Booking;
+import com.smartcampus.model.BookingStatus;
+import com.smartcampus.model.Resource;
+import com.smartcampus.model.ResourceStatus;
+import com.smartcampus.repository.BookingRepository;
+import com.smartcampus.repository.ResourceRepository;
 
 @Service
 public class CampusService {
@@ -107,19 +109,12 @@ public class CampusService {
     }
 
     public Resource createResource(ResourceCreateRequest request) {
-        String name = normalize(request.getName());
-        String type = normalize(request.getType());
-        String location = normalize(request.getLocation());
+        String name = ensureNotBlank(request.getName(), "Resource name is required.");
+        String type = ensureNotBlank(request.getType(), "Resource type is required.");
+        String location = ensureNotBlank(request.getLocation(), "Location is required.");
         String availabilityWindow = normalizeAvailabilityWindow(request.getAvailabilityWindow());
         ResourceStatus status = request.getStatus() != null ? request.getStatus() : ResourceStatus.ACTIVE;
-
-        boolean duplicateExists = resourceRepository
-                .existsByNameIgnoreCaseAndTypeIgnoreCaseAndLocationIgnoreCase(name, type, location);
-
-        if (duplicateExists) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "A resource with the same name, type, and location already exists.");
-        }
+        validateNoDuplicateResource(null, name, type, location);
 
         Resource resource = new Resource();
         resource.setName(name);
@@ -128,6 +123,67 @@ public class CampusService {
         resource.setLocation(location);
         resource.setAvailabilityWindow(availabilityWindow);
         resource.setStatus(status);
+        return resourceRepository.save(resource);
+    }
+
+    public Resource updateResource(String resourceId, ResourceCreateRequest request) {
+        Resource resource = getResourceById(resourceId);
+
+        String name = ensureNotBlank(request.getName(), "Resource name is required.");
+        String type = ensureNotBlank(request.getType(), "Resource type is required.");
+        String location = ensureNotBlank(request.getLocation(), "Location is required.");
+        String availabilityWindow = normalizeAvailabilityWindow(request.getAvailabilityWindow());
+        ResourceStatus status = request.getStatus() != null ? request.getStatus() : ResourceStatus.ACTIVE;
+
+        validateNoDuplicateResource(resourceId, name, type, location);
+
+        resource.setName(name);
+        resource.setType(type);
+        resource.setCapacity(request.getCapacity());
+        resource.setLocation(location);
+        resource.setAvailabilityWindow(availabilityWindow);
+        resource.setStatus(status);
+
+        return resourceRepository.save(resource);
+    }
+
+    public Resource patchResource(String resourceId, ResourceUpdateRequest request) {
+        if (request.getName() == null
+                && request.getType() == null
+                && request.getCapacity() == null
+                && request.getLocation() == null
+                && request.getAvailabilityWindow() == null
+                && request.getStatus() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "At least one field must be provided for update.");
+        }
+
+        Resource resource = getResourceById(resourceId);
+
+        String name = request.getName() != null
+                ? ensureNotBlank(request.getName(), "Resource name cannot be blank.")
+                : resource.getName();
+        String type = request.getType() != null
+                ? ensureNotBlank(request.getType(), "Resource type cannot be blank.")
+                : resource.getType();
+        String location = request.getLocation() != null
+                ? ensureNotBlank(request.getLocation(), "Location cannot be blank.")
+                : resource.getLocation();
+        String availabilityWindow = request.getAvailabilityWindow() != null
+                ? normalizeAvailabilityWindow(request.getAvailabilityWindow())
+                : resource.getAvailabilityWindow();
+        Integer capacity = request.getCapacity() != null ? request.getCapacity() : resource.getCapacity();
+        ResourceStatus status = request.getStatus() != null ? request.getStatus() : resource.getStatus();
+
+        validateNoDuplicateResource(resourceId, name, type, location);
+
+        resource.setName(name);
+        resource.setType(type);
+        resource.setCapacity(capacity);
+        resource.setLocation(location);
+        resource.setAvailabilityWindow(availabilityWindow);
+        resource.setStatus(status);
+
         return resourceRepository.save(resource);
     }
 
@@ -276,8 +332,31 @@ public class CampusService {
         return value == null || value.isBlank();
     }
 
+    private Resource getResourceById(String resourceId) {
+        return resourceRepository.findById(resourceId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Resource not found."));
+    }
+
+    private void validateNoDuplicateResource(String currentResourceId, String name, String type, String location) {
+        resourceRepository.findByNameIgnoreCaseAndTypeIgnoreCaseAndLocationIgnoreCase(name, type, location)
+                .ifPresent(existing -> {
+                    if (!existing.getId().equals(currentResourceId)) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "A resource with the same name, type, and location already exists.");
+                    }
+                });
+    }
+
     private String normalize(String value) {
         return value == null ? null : value.trim().replaceAll("\\s+", " ");
+    }
+
+    private String ensureNotBlank(String value, String errorMessage) {
+        String normalized = normalize(value);
+        if (isBlank(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
+        }
+        return normalized;
     }
 
     private String normalizeAvailabilityWindow(String value) {
