@@ -25,6 +25,10 @@ export default function BookingModal({ onClose, onSuccess, resources, userEmail,
     setError('')
     setLoading(true)
     try {
+      if (!userEmail) {
+        setError('Please sign in before submitting a booking request.')
+        return
+      }
       const resourceName = resources.find(r => r.id === formData.resourceId)?.name || 'Unknown'
 
       const payload = {
