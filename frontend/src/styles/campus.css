@@ -1056,3 +1056,144 @@ a {
   padding: 6px 12px;
   font-size: 0.8rem;
 }
+
+/* Premium Admin Dashboard Additions */
+
+.admin-search-bar {
+  display: flex !important;
+  gap: 16px !important;
+  align-items: center;
+  background: transparent !important;
+  margin-bottom: 24px;
+}
+
+.filter-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.filter-input-wrap .icon {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.filter-input-wrap select,
+.filter-input-wrap input {
+  width: 100%;
+  padding: 12px 14px 12px 18px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  background: var(--white);
+  font-size: 0.95rem;
+  color: #334155 !important;
+  outline: none;
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.filter-input-wrap select:focus,
+.filter-input-wrap input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+}
+
+.btn-primary.apply-btn {
+  padding: 12px 24px !important;
+  border-radius: 12px !important;
+  white-space: nowrap;
+}
+
+.admin-table-container {
+  background: var(--white);
+  border-radius: 16px;
+  border: 1px solid #e7eefc;
+  overflow: visible; /* to avoid cutting off dropdowns if any */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+}
+
+.table-header-custom {
+  color: #475569 !important;
+  font-weight: 700 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  padding: 18px 20px !important;
+  text-transform: capitalize;
+}
+
+.status-badge {
+  display: inline-flex;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.pending {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+.status-badge.approved {
+  background-color: #dcfce7;
+  color: #047857;
+}
+.status-badge.rejected {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+.status-badge.cancelled {
+  background-color: #f1f5f9;
+  color: #334155;
+}
+
+.action-btn-custom {
+  padding: 8px 18px;
+  border-radius: 24px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.action-btn-custom.approve {
+  background: #10b981;
+  color: white;
+}
+.action-btn-custom.reject {
+  background: #dc2626;
+  color: white;
+}
+.action-btn-custom.cancel {
+  background: #f59e0b;
+  color: white;
+}
+.action-btn-custom:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+.action-buttons-flex {
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+}
+
+.cell-requester strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+.cell-requester .sub-text {
+  color: #64748b;
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.modern-table td {
+  vertical-align: middle !important;
+  padding: 20px !important;
+  border-bottom: 1px solid #f8fafc !important;
+}
