@@ -664,6 +664,20 @@ a {
   grid-template-columns: 1fr 1fr 1fr auto;
 }
 
+.resource-filter {
+  grid-template-columns: 1.4fr 1fr 1fr 0.9fr auto;
+}
+
+.resource-filter-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.asset-table .font-mono {
+  font-size: 0.76rem;
+  word-break: break-all;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -756,8 +770,18 @@ a {
   .hero-stats,
   .filter-bar,
   .admin-filter,
+  .resource-filter,
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .resource-filter-actions {
+    width: 100%;
+  }
+
+  .resource-filter-actions .btn-primary,
+  .resource-filter-actions .btn-secondary {
+    width: 100%;
   }
 
   .admin-main {

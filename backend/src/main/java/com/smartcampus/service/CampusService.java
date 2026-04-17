@@ -85,6 +85,27 @@ public class CampusService {
                 .toList();
     }
 
+    public List<Resource> getAdminResources(ResourceStatus status,
+                                            String type,
+                                            String location,
+                                            Integer minCapacity,
+                                            String name) {
+        if (minCapacity != null && minCapacity <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minCapacity must be greater than zero.");
+        }
+
+        return resourceRepository.findAll().stream()
+                .filter(resource -> status == null || resource.getStatus() == status)
+                .filter(resource -> isBlank(type) || equalsIgnoreCase(resource.getType(), type))
+                .filter(resource -> isBlank(location) || containsIgnoreCase(resource.getLocation(), location))
+                .filter(resource -> isBlank(name) || containsIgnoreCase(resource.getName(), name))
+                .filter(resource -> minCapacity == null || resource.getCapacity() >= minCapacity)
+                .sorted(Comparator
+                        .comparing(Resource::getType, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(Resource::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+    }
+
     public Resource createResource(ResourceCreateRequest request) {
         String name = normalize(request.getName());
         String type = normalize(request.getType());

@@ -15,13 +15,22 @@ const initialResourceForm = {
 export default function AdminPanel() {
   const [summary, setSummary] = useState(null)
   const [bookings, setBookings] = useState([])
+  const [resources, setResources] = useState([])
   const [error, setError] = useState('')
+  const [resourceListError, setResourceListError] = useState('')
+  const [isLoadingResources, setIsLoadingResources] = useState(false)
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
   const [resourceForm, setResourceForm] = useState(initialResourceForm)
   const [resourceErrors, setResourceErrors] = useState({})
   const [resourceSubmitError, setResourceSubmitError] = useState('')
   const [resourceSubmitSuccess, setResourceSubmitSuccess] = useState('')
   const [isCreatingResource, setIsCreatingResource] = useState(false)
+  const [resourceFilters, setResourceFilters] = useState({
+    name: '',
+    type: '',
+    status: '',
+    minCapacity: ''
+  })
   const [filters, setFilters] = useState({
     status: '',
     resource: '',
@@ -32,6 +41,7 @@ export default function AdminPanel() {
   useEffect(() => {
     loadSummary()
     loadBookings()
+    loadResources()
   }, [])
 
   useEffect(() => {
@@ -73,6 +83,26 @@ export default function AdminPanel() {
     }
   }
 
+  const loadResources = async (customFilters = resourceFilters) => {
+    try {
+      setIsLoadingResources(true)
+      setResourceListError('')
+
+      const params = {}
+      if (customFilters.name) params.name = customFilters.name
+      if (customFilters.type) params.type = customFilters.type
+      if (customFilters.status) params.status = customFilters.status
+      if (customFilters.minCapacity) params.minCapacity = customFilters.minCapacity
+
+      const response = await campusApi.get('/admin/resources', { params })
+      setResources(response.data)
+    } catch (err) {
+      setResourceListError(err?.response?.data?.message || 'Failed to load resources.')
+    } finally {
+      setIsLoadingResources(false)
+    }
+  }
+
   const handleFilterChange = (event) => {
     const nextFilters = {
       ...filters,
@@ -84,6 +114,30 @@ export default function AdminPanel() {
   const handleFilterSubmit = (event) => {
     event.preventDefault()
     loadBookings(filters)
+  }
+
+  const handleResourceFilterChange = (event) => {
+    const nextFilters = {
+      ...resourceFilters,
+      [event.target.name]: event.target.value
+    }
+    setResourceFilters(nextFilters)
+  }
+
+  const handleResourceFilterSubmit = (event) => {
+    event.preventDefault()
+    loadResources(resourceFilters)
+  }
+
+  const handleResourceFilterReset = () => {
+    const resetFilters = {
+      name: '',
+      type: '',
+      status: '',
+      minCapacity: ''
+    }
+    setResourceFilters(resetFilters)
+    loadResources(resetFilters)
   }
 
   const openResourceModal = () => {
@@ -200,6 +254,7 @@ export default function AdminPanel() {
       setResourceErrors({})
       setResourceSubmitSuccess(`Resource "${payload.name}" added successfully.`)
       await loadSummary()
+      await loadResources(resourceFilters)
     } catch (err) {
       setResourceSubmitError(err?.response?.data?.message || 'Failed to create resource.')
     } finally {
@@ -254,6 +309,7 @@ export default function AdminPanel() {
         </div>
 
         <a href="#dashboard">Dashboard</a>
+        <a href="#resources">Assets</a>
         <a href="#bookings">Booking Review</a>
         <a href="#alerts">Recent Alerts</a>
         <button className="btn-secondary sidebar-btn" onClick={logoutAdmin}>Back to Home</button>
@@ -291,6 +347,102 @@ export default function AdminPanel() {
           <div className="summary-card accent-dark wide-card">
             <h3>{summary?.totalResources ?? 0}</h3>
             <p>Total Resources</p>
+          </div>
+        </section>
+
+        <section id="resources" className="admin-panel-box">
+          <div className="panel-top">
+            <div>
+              <span className="eyebrow">Asset Registry</span>
+              <h2>Detailed resource inventory</h2>
+              <p>View all assets with metadata including capacity, location, availability windows, and status.</p>
+            </div>
+          </div>
+
+          <form className="filter-bar resource-filter" onSubmit={handleResourceFilterSubmit}>
+            <input
+              type="text"
+              name="name"
+              placeholder="Search by asset name"
+              value={resourceFilters.name}
+              onChange={handleResourceFilterChange}
+            />
+
+            <select name="type" value={resourceFilters.type} onChange={handleResourceFilterChange}>
+              <option value="">All Types</option>
+              <option value="Lecture Hall">Lecture Hall</option>
+              <option value="Projector">Projector</option>
+              <option value="Lab">Lab</option>
+              <option value="Meeting Room">Meeting Room</option>
+              <option value="Equipment">Equipment</option>
+              <option value="Other">Other</option>
+            </select>
+
+            <select name="status" value={resourceFilters.status} onChange={handleResourceFilterChange}>
+              <option value="">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="OUT_OF_SERVICE">Out of service</option>
+            </select>
+
+            <input
+              type="number"
+              min="1"
+              step="1"
+              name="minCapacity"
+              placeholder="Min capacity"
+              value={resourceFilters.minCapacity}
+              onChange={handleResourceFilterChange}
+            />
+
+            <div className="resource-filter-actions">
+              <button type="submit" className="btn-primary">Apply</button>
+              <button type="button" className="btn-secondary" onClick={handleResourceFilterReset}>Reset</button>
+            </div>
+          </form>
+
+          {resourceListError && <p className="error-text">{resourceListError}</p>}
+
+          <div className="table-wrap">
+            <table className="booking-table asset-table">
+              <thead>
+                <tr>
+                  <th>Asset ID</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Capacity</th>
+                  <th>Location</th>
+                  <th>Availability</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoadingResources ? (
+                  <tr>
+                    <td colSpan="7" className="empty-state">Loading assets...</td>
+                  </tr>
+                ) : resources.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="empty-state">No assets found.</td>
+                  </tr>
+                ) : (
+                  resources.map((resource) => (
+                    <tr key={resource.id} className="table-row-hover">
+                      <td className="small-text font-mono">{resource.id}</td>
+                      <td>{resource.name || '-'}</td>
+                      <td>{resource.type || '-'}</td>
+                      <td>{resource.capacity ?? '-'}</td>
+                      <td>{resource.location || '-'}</td>
+                      <td>{resource.availabilityWindow || '-'}</td>
+                      <td>
+                        <span className={`status ${String(resource.status).toLowerCase()}`}>
+                          {resource.status || 'UNKNOWN'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
 
