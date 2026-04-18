@@ -175,7 +175,7 @@ export default function HomePage() {
 
         <div className="hero-content container">
           <div className="hero-text">
-            <span className="hero-tag">Spring Boot + React + MongoDB</span>
+
             <h1>{overview?.title || 'Smart Campus Operations Hub'}</h1>
             <p>
               {overview?.subtitle ||
