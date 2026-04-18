@@ -5,9 +5,13 @@ import campusApi from '../api/campusApi'
 export default function TechnicianDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
   const [authLoading, setAuthLoading] = useState(true)
+  const [assignedTickets, setAssignedTickets] = useState([])
+  const [ticketError, setTicketError] = useState('')
+  const [ticketLoading, setTicketLoading] = useState(true)
+  const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [], index: 0 })
+  const [resources, setResources] = useState([])
   const navigate = useNavigate()
 
-  const assignedTickets = []
   const notifications = []
 
   useEffect(() => {
@@ -30,6 +34,7 @@ export default function TechnicianDashboard() {
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
         setProfile({ email, name: name || email })
+        await Promise.all([loadAssignedTickets(), loadResources()])
       } catch (err) {
         navigate('/login')
       } finally {
@@ -39,6 +44,29 @@ export default function TechnicianDashboard() {
 
     initialize()
   }, [])
+
+  const loadAssignedTickets = async () => {
+    try {
+      setTicketLoading(true)
+      setTicketError('')
+      const response = await campusApi.get('/technician/tickets')
+      setAssignedTickets(response.data || [])
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to load assigned tickets.')
+      setAssignedTickets([])
+    } finally {
+      setTicketLoading(false)
+    }
+  }
+
+  const loadResources = async () => {
+    try {
+      const response = await campusApi.get('/resources/public')
+      setResources(response.data || [])
+    } catch (err) {
+      setResources([])
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -56,6 +84,11 @@ export default function TechnicianDashboard() {
     open: assignedTickets.filter(ticket => ticket.status === 'OPEN').length,
     inProgress: assignedTickets.filter(ticket => ticket.status === 'IN_PROGRESS').length,
     resolved: assignedTickets.filter(ticket => ticket.status === 'RESOLVED').length
+  }
+
+  const getTicketName = (ticket) => {
+    const resource = resources.find(r => r.id === ticket.resourceId)
+    return resource ? resource.name : (ticket.resourceId || ticket.id)
   }
 
   if (authLoading) {
@@ -133,31 +166,57 @@ export default function TechnicianDashboard() {
               <thead>
                 <tr>
                   <th>Ticket</th>
-                  <th>Resource</th>
+                  <th>Category</th>
                   <th>Priority</th>
                   <th>Status</th>
-                  <th>Last Update</th>
+                  <th>Evidence</th>
+                  <th>Assigned</th>
                 </tr>
               </thead>
               <tbody>
-                {assignedTickets.length === 0 ? (
+                {ticketLoading ? (
                   <tr>
-                    <td colSpan="5" className="empty-state">No tickets assigned yet.</td>
+                    <td colSpan="7" className="empty-state">Loading tickets...</td>
+                  </tr>
+                ) : assignedTickets.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="empty-state">No tickets assigned yet.</td>
                   </tr>
                 ) : (
                   assignedTickets.map(ticket => (
                     <tr key={ticket.id}>
-                      <td>{ticket.code}</td>
-                      <td>{ticket.resource}</td>
+                      <td className="font-mono">{getTicketName(ticket)}</td>
+                      <td>{ticket.category}</td>
                       <td>{ticket.priority}</td>
                       <td>{ticket.status}</td>
-                      <td>{ticket.updatedAt}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-secondary small-btn"
+                          disabled={!ticket.attachments || ticket.attachments.length === 0}
+                          onClick={() => setAttachmentModal({
+                            open: true,
+                            ticketId: ticket.id,
+                            attachments: ticket.attachments || [],
+                            index: 0
+                          })}
+                        >
+                          {ticket.attachments?.length || 0} files
+                        </button>
+                      </td>
+                      <td>{ticket.assignedAt || ticket.createdAt}</td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+
+          {ticketError && (
+            <div className="error-banner" style={{marginTop: '16px'}}>
+              {ticketError}
+            </div>
+          )}
         </section>
 
         <section id="notifications" className="admin-panel-box glass-panel-soft">
@@ -185,6 +244,48 @@ export default function TechnicianDashboard() {
           )}
         </section>
       </main>
+
+      {attachmentModal.open && (
+        <div className="modal-overlay" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [], index: 0 })}>
+          <div className="modal-content popup-anim evidence-modal-full" onClick={(event) => event.stopPropagation()}>
+            <button className="close-btn" type="button" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [], index: 0 })}>
+              &times;
+            </button>
+            <h2 style={{marginTop: 0}}>Ticket Evidence</h2>
+            {attachmentModal.attachments.length === 0 ? (
+              <p className="text-muted">No attachments for this ticket.</p>
+            ) : (
+              <div className="evidence-viewer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={attachmentModal.index <= 0}
+                  onClick={() => setAttachmentModal(prev => ({ ...prev, index: Math.max(0, prev.index - 1) }))}
+                >
+                  Prev
+                </button>
+                <div className="evidence-frame">
+                  <img
+                    src={attachmentModal.attachments[attachmentModal.index]}
+                    alt={`Attachment ${attachmentModal.index + 1}`}
+                  />
+                  <div className="evidence-count">
+                    {attachmentModal.index + 1} / {attachmentModal.attachments.length}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={attachmentModal.index >= attachmentModal.attachments.length - 1}
+                  onClick={() => setAttachmentModal(prev => ({ ...prev, index: Math.min(prev.attachments.length - 1, prev.index + 1) }))}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

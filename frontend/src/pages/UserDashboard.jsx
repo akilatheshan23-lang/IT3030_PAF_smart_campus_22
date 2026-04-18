@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 import BookingModal from '../components/BookingModal'
 import ReportIncident from '../components/ReportIncident'
+import EditIncidentModal from '../components/EditIncidentModal'
 
 export default function UserDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
@@ -19,6 +20,9 @@ export default function UserDashboard() {
   const [reportModalOpen, setReportModalOpen] = useState(false)
   const [reportResourceId, setReportResourceId] = useState('')
   const [ticketSuccess, setTicketSuccess] = useState('')
+  const [editTicket, setEditTicket] = useState(null)
+  const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [] })
+  const [deletingTicketId, setDeletingTicketId] = useState('')
   const navigate = useNavigate()
   const userEmail = profile.email
   const userName = profile.name
@@ -94,6 +98,27 @@ export default function UserDashboard() {
   const openReportModal = (resourceId) => {
     setReportResourceId(resourceId || '')
     setReportModalOpen(true)
+  }
+
+  const getResourceName = (resourceId) => {
+    const res = resources.find(r => r.id === resourceId)
+    return res ? res.name : resourceId
+  }
+
+  const handleDeleteTicket = async (ticketId) => {
+    if (!ticketId) return
+    const confirmed = window.confirm('Delete this ticket? This cannot be undone.')
+    if (!confirmed) return
+
+    setDeletingTicketId(ticketId)
+    try {
+      await campusApi.delete(`/incidents/${ticketId}`)
+      await loadTickets()
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to delete ticket')
+    } finally {
+      setDeletingTicketId('')
+    }
   }
 
   const handleCancelConfirm = async () => {
@@ -343,22 +368,55 @@ export default function UserDashboard() {
                 <thead>
                   <tr>
                     <th>Ticket</th>
-                    <th>Resource</th>
                     <th>Category</th>
                     <th>Priority</th>
                     <th>Status</th>
+                    <th>Evidence</th>
                     <th>Created</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tickets.map(t => (
                     <tr key={t.id}>
-                      <td className="font-mono">{t.id}</td>
-                      <td>{t.resourceId}</td>
+                      <td className="font-mono">{getResourceName(t.resourceId)}</td>
                       <td>{t.category}</td>
                       <td>{t.priority}</td>
                       <td>{t.status}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-secondary small-btn"
+                          disabled={!t.attachments || t.attachments.length === 0}
+                          onClick={() => setAttachmentModal({
+                            open: true,
+                            ticketId: t.id,
+                            attachments: t.attachments || []
+                          })}
+                        >
+                          {t.attachments?.length || 0} files
+                        </button>
+                      </td>
                       <td>{t.createdAt}</td>
+                      <td>
+                        <div style={{display: 'flex', gap: '8px'}}>
+                          <button
+                            type="button"
+                            className="btn-secondary small-btn"
+                            onClick={() => setEditTicket(t)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-danger small-btn ghost-danger"
+                            disabled={deletingTicketId === t.id}
+                            onClick={() => handleDeleteTicket(t.id)}
+                          >
+                            {deletingTicketId === t.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -419,6 +477,40 @@ export default function UserDashboard() {
                   }}
                   onClose={() => setReportModalOpen(false)}
                 />
+          </div>
+        </div>
+      )}
+
+      {editTicket && (
+        <EditIncidentModal
+          ticket={editTicket}
+          resources={resources}
+          onClose={() => setEditTicket(null)}
+          onSaved={() => {
+            loadTickets()
+            setEditTicket(null)
+          }}
+        />
+      )}
+
+      {attachmentModal.open && (
+        <div className="modal-overlay" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [] })}>
+          <div className="modal-content popup-anim" onClick={(event) => event.stopPropagation()}>
+            <button className="close-btn" type="button" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [] })}>
+              &times;
+            </button>
+            <h2 style={{marginTop: 0}}>Ticket Evidence</h2>
+            {attachmentModal.attachments.length === 0 ? (
+              <p className="text-muted">No attachments for this ticket.</p>
+            ) : (
+              <div className="attachment-grid">
+                {attachmentModal.attachments.map((src, index) => (
+                  <div className="attachment-card" key={`${attachmentModal.ticketId}-${index}`}>
+                    <img src={src} alt={`Attachment ${index + 1}`} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

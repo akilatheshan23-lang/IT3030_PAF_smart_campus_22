@@ -3,6 +3,8 @@ package com.smartcampus.model;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.List;
+
 @Document(collection = "tickets")
 public class Incident {
 
@@ -11,6 +13,12 @@ public class Incident {
     private String resourceId;
     private String category;
     private String description;
+    private List<String> attachments;
+    private String requesterEmail;
+    private String assignedTechnicianId;
+    private String assignedTechnicianName;
+    private String assignedTechnicianEmail;
+    private String assignedAt;
     private Priority priority;
     private IncidentStatus status;
     private String createdAt;
@@ -57,6 +65,54 @@ public class Incident {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public List<String> getAttachments() {
+        return attachments;
+    }
+
+    public void setAttachments(List<String> attachments) {
+        this.attachments = attachments;
+    }
+
+    public String getRequesterEmail() {
+        return requesterEmail;
+    }
+
+    public void setRequesterEmail(String requesterEmail) {
+        this.requesterEmail = requesterEmail;
+    }
+
+    public String getAssignedTechnicianId() {
+        return assignedTechnicianId;
+    }
+
+    public void setAssignedTechnicianId(String assignedTechnicianId) {
+        this.assignedTechnicianId = assignedTechnicianId;
+    }
+
+    public String getAssignedTechnicianName() {
+        return assignedTechnicianName;
+    }
+
+    public void setAssignedTechnicianName(String assignedTechnicianName) {
+        this.assignedTechnicianName = assignedTechnicianName;
+    }
+
+    public String getAssignedTechnicianEmail() {
+        return assignedTechnicianEmail;
+    }
+
+    public void setAssignedTechnicianEmail(String assignedTechnicianEmail) {
+        this.assignedTechnicianEmail = assignedTechnicianEmail;
+    }
+
+    public String getAssignedAt() {
+        return assignedAt;
+    }
+
+    public void setAssignedAt(String assignedAt) {
+        this.assignedAt = assignedAt;
     }
 
     public Priority getPriority() {
