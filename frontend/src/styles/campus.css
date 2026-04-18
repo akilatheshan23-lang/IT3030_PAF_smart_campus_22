@@ -712,6 +712,14 @@ a {
   flex-wrap: wrap;
 }
 
+.resource-actions {
+  min-width: 180px;
+}
+
+.resource-actions .small-btn {
+  min-width: 76px;
+}
+
 .alert-list {
   display: grid;
   gap: 14px;

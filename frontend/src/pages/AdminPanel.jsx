@@ -12,6 +12,19 @@ const initialResourceForm = {
   status: 'ACTIVE'
 }
 
+const resourceTypes = ['Lecture Hall', 'Projector', 'Lab', 'Meeting Room', 'Equipment', 'Other']
+
+const parseAvailabilityWindow = (availabilityWindow) => {
+  const [startRaw = '', endRaw = ''] = String(availabilityWindow || '').split('-').map((part) => part.trim())
+  const isValidStart = /^\d{2}:\d{2}$/.test(startRaw)
+  const isValidEnd = /^\d{2}:\d{2}$/.test(endRaw)
+
+  return {
+    startTime: isValidStart ? startRaw : initialResourceForm.startTime,
+    endTime: isValidEnd ? endRaw : initialResourceForm.endTime
+  }
+}
+
 export default function AdminPanel() {
   const [summary, setSummary] = useState(null)
   const [bookings, setBookings] = useState([])
@@ -24,7 +37,10 @@ export default function AdminPanel() {
   const [resourceErrors, setResourceErrors] = useState({})
   const [resourceSubmitError, setResourceSubmitError] = useState('')
   const [resourceSubmitSuccess, setResourceSubmitSuccess] = useState('')
-  const [isCreatingResource, setIsCreatingResource] = useState(false)
+  const [isSubmittingResource, setIsSubmittingResource] = useState(false)
+  const [resourceModalMode, setResourceModalMode] = useState('create')
+  const [editingResourceId, setEditingResourceId] = useState('')
+  const [resourceStatusUpdateId, setResourceStatusUpdateId] = useState('')
   const [resourceFilters, setResourceFilters] = useState({
     name: '',
     type: '',
@@ -140,18 +156,47 @@ export default function AdminPanel() {
     loadResources(resetFilters)
   }
 
-  const openResourceModal = () => {
+  const openCreateResourceModal = () => {
+    setResourceModalMode('create')
+    setEditingResourceId('')
     setResourceForm(initialResourceForm)
     setResourceErrors({})
     setResourceSubmitError('')
+    setResourceSubmitSuccess('')
+    setIsResourceModalOpen(true)
+  }
+
+  const openEditResourceModal = (resource) => {
+    const { startTime, endTime } = parseAvailabilityWindow(resource.availabilityWindow)
+
+    setResourceModalMode('edit')
+    setEditingResourceId(resource.id || '')
+    setResourceForm({
+      name: resource.name || '',
+      type: resource.type || initialResourceForm.type,
+      capacity: String(resource.capacity ?? ''),
+      location: resource.location || '',
+      startTime,
+      endTime,
+      status: resource.status || initialResourceForm.status
+    })
+    setResourceErrors({})
+    setResourceSubmitError('')
+    setResourceSubmitSuccess('')
     setIsResourceModalOpen(true)
   }
 
   const closeResourceModal = () => {
-    if (isCreatingResource) {
+    if (isSubmittingResource) {
       return
     }
+
     setIsResourceModalOpen(false)
+    setResourceModalMode('create')
+    setEditingResourceId('')
+    setResourceForm(initialResourceForm)
+    setResourceErrors({})
+    setResourceSubmitError('')
   }
 
   const handleResourceInputChange = (event) => {
@@ -227,16 +272,21 @@ export default function AdminPanel() {
     return Object.keys(nextErrors).length === 0
   }
 
-  const handleCreateResource = async (event) => {
+  const handleResourceSubmit = async (event) => {
     event.preventDefault()
 
     if (!validateResourceForm()) {
       return
     }
 
+    if (resourceModalMode === 'edit' && !editingResourceId) {
+      setResourceSubmitError('Unable to update resource. Missing resource ID.')
+      return
+    }
+
     setResourceSubmitError('')
     setResourceSubmitSuccess('')
-    setIsCreatingResource(true)
+    setIsSubmittingResource(true)
 
     const payload = {
       name: resourceForm.name.trim(),
@@ -248,17 +298,58 @@ export default function AdminPanel() {
     }
 
     try {
-      await campusApi.post('/admin/resources', payload)
+      if (resourceModalMode === 'edit') {
+        await campusApi.put(`/admin/resources/${editingResourceId}`, payload)
+      } else {
+        await campusApi.post('/admin/resources', payload)
+      }
+
       setIsResourceModalOpen(false)
+      setResourceModalMode('create')
+      setEditingResourceId('')
       setResourceForm(initialResourceForm)
       setResourceErrors({})
-      setResourceSubmitSuccess(`Resource "${payload.name}" added successfully.`)
+      setResourceSubmitSuccess(
+        resourceModalMode === 'edit'
+          ? `Resource "${payload.name}" updated successfully.`
+          : `Resource "${payload.name}" added successfully.`
+      )
       await loadSummary()
       await loadResources(resourceFilters)
     } catch (err) {
-      setResourceSubmitError(err?.response?.data?.message || 'Failed to create resource.')
+      setResourceSubmitError(
+        err?.response?.data?.message
+          || (resourceModalMode === 'edit' ? 'Failed to update resource.' : 'Failed to create resource.')
+      )
     } finally {
-      setIsCreatingResource(false)
+      setIsSubmittingResource(false)
+    }
+  }
+
+  const handleQuickResourceStatusUpdate = async (resource, targetStatus) => {
+    if (!resource?.id) {
+      return
+    }
+
+    if (resource.status === targetStatus) {
+      return
+    }
+
+    setResourceStatusUpdateId(resource.id)
+    setResourceListError('')
+    setResourceSubmitError('')
+
+    try {
+      await campusApi.patch(`/admin/resources/${resource.id}`, { status: targetStatus })
+
+      const statusLabel = targetStatus === 'OUT_OF_SERVICE' ? 'OUT_OF_SERVICE' : 'ACTIVE'
+      setResourceSubmitSuccess(`Resource "${resource.name}" is now ${statusLabel}.`)
+      await loadSummary()
+      await loadResources(resourceFilters)
+    } catch (err) {
+      setResourceListError(err?.response?.data?.message || 'Failed to update resource status.')
+    } finally {
+      setResourceStatusUpdateId('')
     }
   }
 
@@ -322,7 +413,7 @@ export default function AdminPanel() {
             <h1>Smart Campus Dashboard</h1>
             <p>Monitor requests, review bookings, and keep the system organized from one premium admin interface.</p>
           </div>
-          <button className="btn-primary" type="button" onClick={openResourceModal}>+ Add New Resource</button>
+          <button className="btn-primary" type="button" onClick={openCreateResourceModal}>+ Add New Resource</button>
         </section>
 
         {resourceSubmitSuccess && <p className="success-text">{resourceSubmitSuccess}</p>}
@@ -370,12 +461,9 @@ export default function AdminPanel() {
 
             <select name="type" value={resourceFilters.type} onChange={handleResourceFilterChange}>
               <option value="">All Types</option>
-              <option value="Lecture Hall">Lecture Hall</option>
-              <option value="Projector">Projector</option>
-              <option value="Lab">Lab</option>
-              <option value="Meeting Room">Meeting Room</option>
-              <option value="Equipment">Equipment</option>
-              <option value="Other">Other</option>
+              {resourceTypes.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
             </select>
 
             <select name="status" value={resourceFilters.status} onChange={handleResourceFilterChange}>
@@ -413,16 +501,17 @@ export default function AdminPanel() {
                   <th>Location</th>
                   <th>Availability</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoadingResources ? (
                   <tr>
-                    <td colSpan="7" className="empty-state">Loading assets...</td>
+                    <td colSpan="8" className="empty-state">Loading assets...</td>
                   </tr>
                 ) : resources.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="empty-state">No assets found.</td>
+                    <td colSpan="8" className="empty-state">No assets found.</td>
                   </tr>
                 ) : (
                   resources.map((resource) => (
@@ -437,6 +526,38 @@ export default function AdminPanel() {
                         <span className={`status ${String(resource.status).toLowerCase()}`}>
                           {resource.status || 'UNKNOWN'}
                         </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons resource-actions">
+                          <button
+                            className="btn-secondary small-btn"
+                            type="button"
+                            onClick={() => openEditResourceModal(resource)}
+                            disabled={resourceStatusUpdateId === resource.id}
+                          >
+                            Edit
+                          </button>
+
+                          {resource.status === 'OUT_OF_SERVICE' ? (
+                            <button
+                              className="btn-success small-btn"
+                              type="button"
+                              onClick={() => handleQuickResourceStatusUpdate(resource, 'ACTIVE')}
+                              disabled={resourceStatusUpdateId === resource.id}
+                            >
+                              {resourceStatusUpdateId === resource.id ? 'Updating...' : 'Mark Active'}
+                            </button>
+                          ) : (
+                            <button
+                              className="btn-warning small-btn"
+                              type="button"
+                              onClick={() => handleQuickResourceStatusUpdate(resource, 'OUT_OF_SERVICE')}
+                              disabled={resourceStatusUpdateId === resource.id}
+                            >
+                              {resourceStatusUpdateId === resource.id ? 'Updating...' : 'Mark Out of Service'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -589,13 +710,24 @@ export default function AdminPanel() {
           }}
         >
           <div className="modal-content glass-panel popup-anim resource-modal" role="dialog" aria-modal="true" aria-labelledby="resource-modal-title">
-            <h2 id="resource-modal-title">Add New Resource</h2>
-            <button className="close-btn" type="button" onClick={closeResourceModal} aria-label="Close add resource form">&times;</button>
-            <p className="resource-modal-subtitle">Create lecture halls, projectors, labs, and other university facilities.</p>
+            <h2 id="resource-modal-title">{resourceModalMode === 'edit' ? 'Edit Resource' : 'Add New Resource'}</h2>
+            <button
+              className="close-btn"
+              type="button"
+              onClick={closeResourceModal}
+              aria-label={resourceModalMode === 'edit' ? 'Close edit resource form' : 'Close add resource form'}
+            >
+              &times;
+            </button>
+            <p className="resource-modal-subtitle">
+              {resourceModalMode === 'edit'
+                ? 'Modify asset details or mark it out of service during maintenance.'
+                : 'Create lecture halls, projectors, labs, and other university facilities.'}
+            </p>
 
             {resourceSubmitError && <div className="error-banner">{resourceSubmitError}</div>}
 
-            <form onSubmit={handleCreateResource} className="booking-form resource-form">
+            <form onSubmit={handleResourceSubmit} className="booking-form resource-form">
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="resourceName">Resource Name</label>
@@ -621,12 +753,9 @@ export default function AdminPanel() {
                     onChange={handleResourceInputChange}
                     className={resourceErrors.type ? 'input-error' : ''}
                   >
-                    <option value="Lecture Hall">Lecture Hall</option>
-                    <option value="Projector">Projector</option>
-                    <option value="Lab">Lab</option>
-                    <option value="Meeting Room">Meeting Room</option>
-                    <option value="Equipment">Equipment</option>
-                    <option value="Other">Other</option>
+                    {resourceTypes.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
                   </select>
                   {resourceErrors.type && <span className="field-error">{resourceErrors.type}</span>}
                 </div>
@@ -709,11 +838,13 @@ export default function AdminPanel() {
               </div>
 
               <div className="resource-form-actions">
-                <button type="button" className="btn-secondary" onClick={closeResourceModal} disabled={isCreatingResource}>
+                <button type="button" className="btn-secondary" onClick={closeResourceModal} disabled={isSubmittingResource}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" disabled={isCreatingResource}>
-                  {isCreatingResource ? 'Creating...' : 'Create Resource'}
+                <button type="submit" className="btn-primary" disabled={isSubmittingResource}>
+                  {isSubmittingResource
+                    ? (resourceModalMode === 'edit' ? 'Saving...' : 'Creating...')
+                    : (resourceModalMode === 'edit' ? 'Save Changes' : 'Create Resource')}
                 </button>
               </div>
             </form>
