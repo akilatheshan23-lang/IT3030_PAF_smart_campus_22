@@ -115,7 +115,6 @@ export default function UserDashboard() {
     b => b.status === 'APPROVED' && new Date(`${b.bookingDate}T${b.endTime}`) >= new Date()
   )
   const historyBookings = bookings
-  const topResources = resources.slice(0, 3)
 
   if (authLoading) {
     return null
@@ -176,14 +175,14 @@ export default function UserDashboard() {
             </div>
           </div>
 
-          {topResources.length === 0 ? (
+          {resources.length === 0 ? (
             <div className="empty-state custom-empty glass-empty">
               <span className="empty-icon">🏛</span>
               <p>No resources loaded yet.</p>
             </div>
           ) : (
             <div className="resource-grid premium-grid">
-              {topResources.map(resource => (
+              {resources.map(resource => (
                 <div key={resource.id} className="resource-card">
                   <div className="resource-top">
                     <span className="badge">{resource.type}</span>
