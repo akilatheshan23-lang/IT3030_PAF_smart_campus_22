@@ -28,10 +28,29 @@ public class MongoStartupVerifier implements ApplicationRunner {
         Document pingResult = mongoTemplate.executeCommand(new Document("ping", 1));
         String dbName = mongoTemplate.getDb().getName();
 
+        ensureTicketsCollection();
+        ensureBookingsCollection();
+
         logger.info("MongoDB connected successfully. database='{}', uri='{}', ping='{}'",
                 dbName,
                 sanitizeUri(mongoUri),
                 pingResult.get("ok"));
+    }
+
+    private void ensureTicketsCollection() {
+        String collectionName = "tickets";
+        if (!mongoTemplate.collectionExists(collectionName)) {
+            mongoTemplate.createCollection(collectionName);
+            logger.info("Created MongoDB collection '{}'", collectionName);
+        }
+    }
+
+    private void ensureBookingsCollection() {
+        String collectionName = "bookings";
+        if (!mongoTemplate.collectionExists(collectionName)) {
+            mongoTemplate.createCollection(collectionName);
+            logger.info("Created MongoDB collection '{}'", collectionName);
+        }
     }
 
     private String sanitizeUri(String uri) {
