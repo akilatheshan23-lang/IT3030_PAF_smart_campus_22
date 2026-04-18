@@ -41,6 +41,7 @@ export default function AdminPanel() {
   const [resourceModalMode, setResourceModalMode] = useState('create')
   const [editingResourceId, setEditingResourceId] = useState('')
   const [resourceStatusUpdateId, setResourceStatusUpdateId] = useState('')
+  const [resourceDeleteId, setResourceDeleteId] = useState('')
   const [resourceFilters, setResourceFilters] = useState({
     name: '',
     type: '',
@@ -353,6 +354,34 @@ export default function AdminPanel() {
     }
   }
 
+  const handleDeleteResource = async (resource) => {
+    if (!resource?.id) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Delete resource "${resource.name}"? This action cannot be undone.`
+    )
+    if (!confirmed) {
+      return
+    }
+
+    setResourceDeleteId(resource.id)
+    setResourceListError('')
+    setResourceSubmitError('')
+
+    try {
+      await campusApi.delete(`/admin/resources/${resource.id}`)
+      setResourceSubmitSuccess(`Resource "${resource.name}" deleted successfully.`)
+      await loadSummary()
+      await loadResources(resourceFilters)
+    } catch (err) {
+      setResourceListError(err?.response?.data?.message || 'Failed to delete resource.')
+    } finally {
+      setResourceDeleteId('')
+    }
+  }
+
   const handleStatusUpdate = async (bookingId, status) => {
     let reason = ''
 
@@ -533,7 +562,7 @@ export default function AdminPanel() {
                             className="btn-secondary small-btn"
                             type="button"
                             onClick={() => openEditResourceModal(resource)}
-                            disabled={resourceStatusUpdateId === resource.id}
+                            disabled={resourceStatusUpdateId === resource.id || resourceDeleteId === resource.id}
                           >
                             Edit
                           </button>
@@ -543,7 +572,7 @@ export default function AdminPanel() {
                               className="btn-success small-btn"
                               type="button"
                               onClick={() => handleQuickResourceStatusUpdate(resource, 'ACTIVE')}
-                              disabled={resourceStatusUpdateId === resource.id}
+                              disabled={resourceStatusUpdateId === resource.id || resourceDeleteId === resource.id}
                             >
                               {resourceStatusUpdateId === resource.id ? 'Updating...' : 'Mark Active'}
                             </button>
@@ -552,11 +581,20 @@ export default function AdminPanel() {
                               className="btn-warning small-btn"
                               type="button"
                               onClick={() => handleQuickResourceStatusUpdate(resource, 'OUT_OF_SERVICE')}
-                              disabled={resourceStatusUpdateId === resource.id}
+                              disabled={resourceStatusUpdateId === resource.id || resourceDeleteId === resource.id}
                             >
                               {resourceStatusUpdateId === resource.id ? 'Updating...' : 'Mark Out of Service'}
                             </button>
                           )}
+
+                          <button
+                            className="btn-danger small-btn"
+                            type="button"
+                            onClick={() => handleDeleteResource(resource)}
+                            disabled={resourceStatusUpdateId === resource.id || resourceDeleteId === resource.id}
+                          >
+                            {resourceDeleteId === resource.id ? 'Deleting...' : 'Delete'}
+                          </button>
                         </div>
                       </td>
                     </tr>

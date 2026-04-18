@@ -3,6 +3,7 @@ package com.smartcampus.controller;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -57,5 +58,11 @@ public class ResourceController {
     @PatchMapping("/{id}")
     public Resource patchResource(@PathVariable String id, @Valid @RequestBody ResourceUpdateRequest request) {
         return campusService.patchResource(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteResource(@PathVariable String id) {
+        campusService.deleteResource(id);
     }
 }

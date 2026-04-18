@@ -187,6 +187,18 @@ public class CampusService {
         return resourceRepository.save(resource);
     }
 
+    public void deleteResource(String resourceId) {
+        Resource resource = getResourceById(resourceId);
+
+        List<BookingStatus> blockingStatuses = List.of(BookingStatus.PENDING, BookingStatus.APPROVED);
+        if (bookingRepository.existsByResourceIdAndStatusIn(resourceId, blockingStatuses)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Resource cannot be deleted while it has pending or approved bookings.");
+        }
+
+        resourceRepository.delete(resource);
+    }
+
     public Booking updateBookingStatus(String bookingId, BookingStatusUpdateRequest request) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found."));
