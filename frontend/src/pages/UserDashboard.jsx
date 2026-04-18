@@ -224,10 +224,12 @@ export default function UserDashboard() {
           )}
         </section>
 
-        <section id="upcoming" className="user-section">
-          <div className="section-header-row">
-            <h2>Upcoming Bookings</h2>
-            <span className="badge counter-badge">{upcomingBookings.length} Active</span>
+        <section id="upcoming" className="user-section" style={{ marginBottom: '40px' }}>
+          <div className="section-header-row" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: '#0f172a' }}>Upcoming Bookings</h2>
+            <span style={{ backgroundColor: '#e0e7ff', color: '#3730a3', padding: '6px 14px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '800' }}>
+              {upcomingBookings.length} Active
+            </span>
           </div>
 
           {upcomingBookings.length === 0 ? (
@@ -237,19 +239,54 @@ export default function UserDashboard() {
               <button className="btn-secondary" style={{ marginTop: '16px' }} onClick={() => setIsModalOpen(true)}>Book Something</button>
             </div>
           ) : (
-            <div className="resource-grid premium-grid">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
               {upcomingBookings.map(b => (
-                <div key={b.id} className="resource-card booking-card premium-booking accent-green">
-                  <div className="resource-top">
-                    <span className="badge resource-badge">{b.resourceName}</span>
-                    <span className="status approved dot-status">APPROVED</span>
+                <div key={b.id} style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  border: '1px solid rgba(0,0,0,0.02)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ backgroundColor: '#e0e7ff', color: '#3730a3', padding: '8px 16px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '800' }}>
+                      {b.resourceName}
+                    </span>
+                    <span style={{ backgroundColor: '#dcfce7', color: '#166534', padding: '8px 16px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '800', letterSpacing: '0.05em' }}>
+                      APPROVED
+                    </span>
                   </div>
-                  <h3 className="booking-date">{b.bookingDate}</h3>
-                  <div className="booking-time-wrap">
-                    <p>⏱ {b.startTime} - {b.endTime}</p>
+                  <h3 style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: '800', color: '#0f172a' }}>
+                    {b.bookingDate}
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.95rem', gap: '8px' }}>
+                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                    <span>{b.startTime} - {b.endTime}</span>
                   </div>
-                  <p className="purpose-text">"{b.purpose}"</p>
-                  <button className="btn-danger full-width hover-lift" onClick={() => triggerCancel(b.id)}>Cancel Booking</button>
+                  <p style={{ margin: '0 0 12px 0', color: '#64748b', fontStyle: 'italic', fontSize: '0.95rem' }}>
+                    "{b.purpose}"
+                  </p>
+                  <button 
+                    className="hover-lift"
+                    style={{
+                      backgroundColor: '#da292e',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '12px 28px',
+                      fontSize: '0.95rem',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      alignSelf: 'flex-start',
+                      transition: 'transform 0.2s, box-shadow 0.2s'
+                    }}
+                    onClick={() => triggerCancel(b.id)}
+                  >
+                    Cancel Booking
+                  </button>
                 </div>
               ))}
             </div>
