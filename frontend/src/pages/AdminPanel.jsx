@@ -96,6 +96,12 @@ export default function AdminPanel() {
     loadResources()
     loadTickets()
     loadTechnicians()
+
+    const summaryRefreshInterval = window.setInterval(() => {
+      loadSummary()
+    }, 15000)
+
+    return () => window.clearInterval(summaryRefreshInterval)
   }, [])
 
   useEffect(() => {
@@ -619,6 +625,134 @@ export default function AdminPanel() {
     doc.save('booking_management_report.pdf')
   }
 
+  const totalResourceCount = Number(summary?.totalResources ?? 0)
+  const activeResourceCount = Number(summary?.activeResources ?? 0)
+  const outOfServiceResourceCount = Number(summary?.outOfServiceResources ?? 0)
+  const inventoryTotal = totalResourceCount > 0
+    ? totalResourceCount
+    : activeResourceCount + outOfServiceResourceCount
+  const activeResourcePercent = inventoryTotal > 0
+    ? Math.round((activeResourceCount / inventoryTotal) * 100)
+    : 0
+  const outOfServiceResourcePercent = inventoryTotal > 0
+    ? Math.round((outOfServiceResourceCount / inventoryTotal) * 100)
+    : 0
+
+  const buildTopBookedFromBookings = (sourceBookings) => {
+    const countByResource = {}
+
+    sourceBookings.forEach((booking) => {
+      const label = booking?.resourceName || booking?.resourceId || 'Unknown Resource'
+      countByResource[label] = (countByResource[label] || 0) + 1
+    })
+
+    return Object.entries(countByResource)
+      .map(([resourceName, bookingCount]) => ({ resourceName, bookingCount }))
+      .sort((a, b) => b.bookingCount - a.bookingCount || a.resourceName.localeCompare(b.resourceName))
+      .slice(0, 5)
+  }
+
+  const formatPeakHourLabel = (hour) => {
+    const normalized = ((hour % 24) + 24) % 24
+    const displayHour = normalized % 12 === 0 ? 12 : normalized % 12
+    return `${displayHour} ${normalized >= 12 ? 'PM' : 'AM'}`
+  }
+
+  const normalizePeakHours = (sourceHours) => {
+    const baseline = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      hourLabel: formatPeakHourLabel(hour),
+      bookingCount: 0
+    }))
+
+    sourceHours.forEach((item, index) => {
+      const parsedHour = Number(item?.hour)
+      const safeHour = Number.isFinite(parsedHour)
+        ? Math.max(0, Math.min(23, Math.floor(parsedHour)))
+        : Math.max(0, Math.min(23, index))
+      const safeCount = Math.max(0, Number(item?.bookingCount ?? 0))
+
+      baseline[safeHour] = {
+        hour: safeHour,
+        hourLabel: String(item?.hourLabel || formatPeakHourLabel(safeHour)),
+        bookingCount: safeCount
+      }
+    })
+
+    return baseline
+  }
+
+  const buildPeakHoursFromBookings = (sourceBookings) => {
+    const hourlyCounts = Array.from({ length: 24 }, () => 0)
+
+    sourceBookings.forEach((booking) => {
+      const startRaw = String(booking?.startTime || '')
+      const endRaw = String(booking?.endTime || '')
+      const startHour = Number(startRaw.split(':')[0])
+      const endHour = Number(endRaw.split(':')[0])
+
+      if (!Number.isInteger(startHour) || !Number.isInteger(endHour) || startHour < 0 || startHour > 23 || endHour < 0 || endHour > 23) {
+        return
+      }
+
+      const normalizedEnd = endHour <= startHour ? startHour + 1 : endHour
+      for (let hour = startHour; hour < normalizedEnd && hour < 24; hour += 1) {
+        hourlyCounts[hour] += 1
+      }
+    })
+
+    return hourlyCounts.map((bookingCount, hour) => ({
+      hour,
+      hourLabel: formatPeakHourLabel(hour),
+      bookingCount
+    }))
+  }
+
+  const summaryTopBookedResources = Array.isArray(summary?.topBookedResources)
+    ? summary.topBookedResources
+      .map((item) => ({
+        resourceName: item?.resourceName || item?.resourceId || 'Unknown Resource',
+        bookingCount: Number(item?.bookingCount ?? 0)
+      }))
+      .filter((item) => item.bookingCount > 0)
+    : []
+  const preferredBookingSource = bookings.filter(
+    (booking) => booking?.status === 'APPROVED' || booking?.status === 'COMPLETED'
+  )
+  const fallbackBookingSource = bookings.filter((booking) => booking?.status !== 'CANCELLED')
+  const fallbackTopBookedResources = preferredBookingSource.length > 0
+    ? buildTopBookedFromBookings(preferredBookingSource)
+    : buildTopBookedFromBookings(fallbackBookingSource)
+  const topBookedResources = summaryTopBookedResources.length > 0
+    ? summaryTopBookedResources
+    : fallbackTopBookedResources
+  const highestBookingCount = topBookedResources.length > 0
+    ? Math.max(...topBookedResources.map((item) => item.bookingCount))
+    : 0
+  const summaryPeakBookingHours = normalizePeakHours(Array.isArray(summary?.peakBookingHours) ? summary.peakBookingHours : [])
+  const fallbackPeakBookingHours = buildPeakHoursFromBookings(
+    preferredBookingSource.length > 0 ? preferredBookingSource : fallbackBookingSource
+  )
+  const hasSummaryPeakData = summaryPeakBookingHours.some((point) => point.bookingCount > 0)
+  const peakBookingHours = hasSummaryPeakData ? summaryPeakBookingHours : fallbackPeakBookingHours
+  const peakBookingMax = peakBookingHours.length > 0
+    ? Math.max(...peakBookingHours.map((point) => point.bookingCount))
+    : 0
+  const hasPeakBookingData = peakBookingMax > 0
+  const peakLinePoints = peakBookingHours
+    .map((point, index) => {
+      const x = (index / (peakBookingHours.length - 1 || 1)) * 100
+      const y = hasPeakBookingData
+        ? 100 - (point.bookingCount / peakBookingMax) * 100
+        : 100
+      return `${x},${y}`
+    })
+    .join(' ')
+  const peakHourTicks = [0, 6, 12, 18, 23].map((hour) => ({
+    hour,
+    label: peakBookingHours[hour]?.hourLabel || formatPeakHourLabel(hour)
+  }))
+
   return (
     <div className="admin-layout user-layout">
       <aside className="admin-sidebar user-sidebar">
@@ -832,6 +966,104 @@ export default function AdminPanel() {
           <div className="summary-card accent-dark wide-card booking-card" style={{background: 'linear-gradient(135deg, #1e1b4b, #312e81)'}}>
             <h3>{summary?.totalResources ?? 0}</h3>
             <p>Total Resources</p>
+          </div>
+        </section>
+
+        <section className="admin-panel-box inventory-dashboard">
+          <div className="panel-top inventory-panel-top">
+            <div>
+              <span className="eyebrow">Inventory Dashboard</span>
+              <h2>Asset status overview</h2>
+              <p>Visual breakdown of how many assets are ACTIVE vs OUT_OF_SERVICE.</p>
+            </div>
+          </div>
+
+          <div className="inventory-layout">
+            <article className="inventory-tile active-tile">
+              <div className="inventory-title-row">
+                <h3>ACTIVE</h3>
+                <span className="inventory-pill">{activeResourcePercent}%</span>
+              </div>
+              <p className="inventory-count">{activeResourceCount}</p>
+              <div className="inventory-progress" aria-label="Active asset ratio">
+                <span style={{ width: `${activeResourcePercent}%` }} />
+              </div>
+            </article>
+
+            <article className="inventory-tile out-of-service-tile">
+              <div className="inventory-title-row">
+                <h3>OUT_OF_SERVICE</h3>
+                <span className="inventory-pill">{outOfServiceResourcePercent}%</span>
+              </div>
+              <p className="inventory-count">{outOfServiceResourceCount}</p>
+              <div className="inventory-progress" aria-label="Out of service asset ratio">
+                <span style={{ width: `${outOfServiceResourcePercent}%` }} />
+              </div>
+            </article>
+
+            <article className="inventory-total-card">
+              <p>Total Assets</p>
+              <h3>{inventoryTotal}</h3>
+              <small>Live inventory health snapshot</small>
+            </article>
+          </div>
+        </section>
+
+        <section className="admin-panel-box utilization-dashboard">
+          <div className="panel-top utilization-panel-top">
+            <div>
+              <span className="eyebrow">Utilization Analytics</span>
+              <h2>Top 5 Most Booked Resources</h2>
+              <p>Highest demand resources based on approved and completed bookings.</p>
+            </div>
+          </div>
+
+          {topBookedResources.length === 0 ? (
+            <p className="empty-state">No bookings available yet for utilization analytics.</p>
+          ) : (
+            <div className="booked-chart-list">
+              {topBookedResources.map((item, index) => {
+                const widthPercent = highestBookingCount > 0
+                  ? Math.round((item.bookingCount / highestBookingCount) * 100)
+                  : 0
+
+                return (
+                  <div className="booked-chart-row" key={`${item.resourceName}-${index}`}>
+                    <div className="booked-chart-label-row">
+                      <span className="booked-chart-label" title={item.resourceName}>{item.resourceName}</span>
+                      <span className="booked-chart-value">{item.bookingCount}</span>
+                    </div>
+                    <div className="booked-chart-track" aria-label={`${item.resourceName} booking count`}>
+                      <span style={{ width: `${widthPercent}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="peak-hours-card">
+            <div className="peak-hours-header">
+              <h3>Peak Booking Hours</h3>
+              <span>{hasPeakBookingData ? `${peakBookingMax} peak concurrent bookings` : 'No booking trend yet'}</span>
+            </div>
+
+            {hasPeakBookingData ? (
+              <>
+                <div className="peak-line-chart-wrap">
+                  <svg className="peak-line-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Peak booking hours line graph">
+                    <polyline points={peakLinePoints} />
+                  </svg>
+                </div>
+                <div className="peak-line-axis">
+                  {peakHourTicks.map((tick) => (
+                    <span key={tick.hour}>{tick.label}</span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="empty-state">No bookings available to render peak booking hours.</p>
+            )}
           </div>
         </section>
 

@@ -8,6 +8,9 @@ import ReportIncident from '../components/ReportIncident'
 import EditIncidentModal from '../components/EditIncidentModal'
 import IncidentCommentsModal from '../components/IncidentCommentsModal'
 
+const catalogueTypes = ['Lecture Hall', 'Lab', 'Meeting Room', 'Equipment', 'Other']
+const capacityPattern = /^(<=|>=|=|<|>)?\s*(\d+)$/
+
 export default function UserDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
   const [authLoading, setAuthLoading] = useState(true)
@@ -30,6 +33,12 @@ export default function UserDashboard() {
   const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [] })
   const [deletingTicketId, setDeletingTicketId] = useState('')
   const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
+  const [catalogueFilters, setCatalogueFilters] = useState({
+    type: '',
+    capacity: '',
+    location: ''
+  })
+  const [catalogueFilterError, setCatalogueFilterError] = useState('')
   
   const navigate = useNavigate()
   const userEmail = profile.email
@@ -90,13 +99,64 @@ export default function UserDashboard() {
     }
   }
 
-  const loadResources = async () => {
+  const loadResources = async (customFilters = catalogueFilters) => {
+    const normalizedType = String(customFilters.type || '').trim()
+    const normalizedLocation = String(customFilters.location || '').trim()
+    const rawCapacity = String(customFilters.capacity || '').trim()
+
+    if (rawCapacity && !capacityPattern.test(rawCapacity)) {
+      setCatalogueFilterError('Invalid capacity. Use values like 50, >50, >=50, <30, or <=30.')
+      setResources([])
+      return
+    }
+
     try {
-      const response = await campusApi.get('/resources/public')
+      setCatalogueFilterError('')
+
+      const params = {}
+      if (normalizedType) params.type = normalizedType
+      if (normalizedLocation) params.location = normalizedLocation
+
+      if (rawCapacity) {
+        const [, operatorRaw, valueRaw] = rawCapacity.match(capacityPattern)
+        const operator = operatorRaw || '>='
+        const value = Number(valueRaw)
+        params.capacity = `${operator}${value}`
+
+        // Backward-compatible fallback for servers that only support minCapacity.
+        if (operator === '>=') {
+          params.minCapacity = value
+        } else if (operator === '>') {
+          params.minCapacity = value + 1
+        }
+      }
+
+      const response = await campusApi.get('/resources/public', { params })
       setResources(response.data)
     } catch (err) {
+      const message = err?.response?.data?.message || 'Failed to load resources.'
+      setCatalogueFilterError(message)
       console.error(err)
     }
+  }
+
+  const handleCatalogueFilterChange = (event) => {
+    const nextFilters = {
+      ...catalogueFilters,
+      [event.target.name]: event.target.value
+    }
+    setCatalogueFilters(nextFilters)
+  }
+
+  const handleCatalogueFilterSubmit = (event) => {
+    event.preventDefault()
+    loadResources(catalogueFilters)
+  }
+
+  const handleCatalogueFilterReset = () => {
+    const resetFilters = { type: '', capacity: '', location: '' }
+    setCatalogueFilters(resetFilters)
+    loadResources(resetFilters)
   }
 
 
@@ -255,6 +315,42 @@ export default function UserDashboard() {
               <p>Preview bookable spaces and equipment with key metadata.</p>
             </div>
           </div>
+
+          <form className="filter-bar resource-filter" onSubmit={handleCatalogueFilterSubmit}>
+            <select
+              name="type"
+              value={catalogueFilters.type}
+              onChange={handleCatalogueFilterChange}
+            >
+              <option value="">All Types</option>
+              {catalogueTypes.map((typeOption) => (
+                <option key={typeOption} value={typeOption}>{typeOption}</option>
+              ))}
+            </select>
+
+            <input
+              type="text"
+              name="capacity"
+              placeholder="Capacity (e.g. > 50, <= 120, 80)"
+              value={catalogueFilters.capacity}
+              onChange={handleCatalogueFilterChange}
+            />
+
+            <input
+              type="text"
+              name="location"
+              placeholder="Location (e.g. Block B)"
+              value={catalogueFilters.location}
+              onChange={handleCatalogueFilterChange}
+            />
+
+            <div className="resource-filter-actions">
+              <button type="submit" className="btn-primary">Apply</button>
+              <button type="button" className="btn-secondary" onClick={handleCatalogueFilterReset}>Reset</button>
+            </div>
+          </form>
+
+          {catalogueFilterError && <p className="error-text">{catalogueFilterError}</p>}
 
           {resources.length === 0 ? (
             <div className="empty-state custom-empty glass-empty">

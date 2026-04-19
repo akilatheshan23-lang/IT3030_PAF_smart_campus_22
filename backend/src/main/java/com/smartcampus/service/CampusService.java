@@ -7,12 +7,18 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -32,13 +38,23 @@ import com.smartcampus.repository.ResourceRepository;
 public class CampusService {
 
     private static final DateTimeFormatter HH_MM_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final Pattern CAPACITY_FILTER_PATTERN = Pattern.compile("^(<=|>=|=|<|>)?\\s*(\\d+)\\s*$");
+    private static final Pattern ACTIVE_STATUS_PATTERN = Pattern.compile("^\\s*ACTIVE\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern OUT_OF_SERVICE_STATUS_PATTERN = Pattern.compile(
+            "^\\s*(OUT_OF_SERVICE|OUT OF SERVICE|OUT-OF-SERVICE)\\s*$",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final ResourceRepository resourceRepository;
     private final BookingRepository bookingRepository;
+    private final MongoTemplate mongoTemplate;
 
-    public CampusService(ResourceRepository resourceRepository, BookingRepository bookingRepository) {
+    public CampusService(ResourceRepository resourceRepository,
+                         BookingRepository bookingRepository,
+                         MongoTemplate mongoTemplate) {
         this.resourceRepository = resourceRepository;
         this.bookingRepository = bookingRepository;
+        this.mongoTemplate = mongoTemplate;
     }
 
     public Map<String, Object> getHomeOverview() {
@@ -54,29 +70,133 @@ public class CampusService {
         return data;
     }
 
-    public List<Resource> getPublicResources(String type, String location, Integer minCapacity) {
+    public List<Resource> getPublicResources(String type,
+                                             String location,
+                                             Integer minCapacity,
+                                             String capacityFilter) {
+        CapacityRule capacityRule = buildCapacityRule(capacityFilter, minCapacity);
+
         return resourceRepository.findAll().stream()
                 .filter(resource -> resource.getStatus() == ResourceStatus.ACTIVE)
                 .filter(resource -> isBlank(type) || equalsIgnoreCase(resource.getType(), type))
                 .filter(resource -> isBlank(location) || containsIgnoreCase(resource.getLocation(), location))
-                .filter(resource -> minCapacity == null || resource.getCapacity() >= minCapacity)
+                .filter(resource -> matchesCapacity(resource.getCapacity(), capacityRule))
                 .sorted(Comparator.comparing(Resource::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
     public Map<String, Object> getAdminSummary() {
+        long activeResources = mongoTemplate.count(
+            new Query(Criteria.where("status").regex(ACTIVE_STATUS_PATTERN)),
+            Resource.class
+        );
+        long outOfServiceResources = mongoTemplate.count(
+            new Query(Criteria.where("status").regex(OUT_OF_SERVICE_STATUS_PATTERN)),
+            Resource.class
+        );
+        long totalResources = resourceRepository.count();
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("pendingBookings", bookingRepository.countByStatus(BookingStatus.PENDING));
         data.put("approvedBookings", bookingRepository.countByStatus(BookingStatus.APPROVED));
         data.put("rejectedBookings", bookingRepository.countByStatus(BookingStatus.REJECTED));
         data.put("cancelledBookings", bookingRepository.countByStatus(BookingStatus.CANCELLED));
-        data.put("totalResources", resourceRepository.count());
+        data.put("totalResources", totalResources);
+        data.put("activeResources", activeResources);
+        data.put("outOfServiceResources", outOfServiceResources);
+        data.put("topBookedResources", buildTopBookedResources());
+        data.put("peakBookingHours", buildPeakBookingHours());
         data.put("recentAlerts", List.of(
                 "Pending booking requests require review",
                 "Out-of-service resource should be monitored",
                 "Recent booking updates were processed successfully"
         ));
         return data;
+    }
+
+    private List<Map<String, Object>> buildTopBookedResources() {
+        Map<String, Long> countByResourceId = new LinkedHashMap<>();
+        Map<String, String> labelByResourceId = new HashMap<>();
+
+        bookingRepository.findAll().stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.APPROVED
+                        || booking.getStatus() == BookingStatus.COMPLETED)
+                .filter(booking -> !isBlank(booking.getResourceId()))
+                .forEach(booking -> {
+                    String resourceId = booking.getResourceId().trim();
+                    countByResourceId.put(resourceId, countByResourceId.getOrDefault(resourceId, 0L) + 1L);
+
+                    if (!isBlank(booking.getResourceName())) {
+                        labelByResourceId.put(resourceId, booking.getResourceName().trim());
+                    }
+                });
+
+        return countByResourceId.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue(Comparator.reverseOrder())
+                        .thenComparing(
+                                entry -> labelByResourceId.getOrDefault(entry.getKey(), entry.getKey()),
+                                String.CASE_INSENSITIVE_ORDER
+                        ))
+                .limit(5)
+                .map(entry -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("resourceId", entry.getKey());
+                    item.put("resourceName", labelByResourceId.getOrDefault(entry.getKey(), entry.getKey()));
+                    item.put("bookingCount", entry.getValue());
+                    return item;
+                })
+                .toList();
+    }
+
+    private List<Map<String, Object>> buildPeakBookingHours() {
+        int[] hourlyCounts = new int[24];
+
+        bookingRepository.findAll().stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.APPROVED
+                        || booking.getStatus() == BookingStatus.COMPLETED)
+                .forEach(booking -> {
+                    LocalTime start = parseTimeSafely(booking.getStartTime());
+                    LocalTime end = parseTimeSafely(booking.getEndTime());
+
+                    if (start == null || end == null || !end.isAfter(start)) {
+                        return;
+                    }
+
+                    for (int hour = 0; hour < 24; hour++) {
+                        LocalTime slotStart = LocalTime.of(hour, 0);
+                        LocalTime slotEnd = hour == 23 ? LocalTime.MAX : LocalTime.of(hour + 1, 0);
+                        boolean overlaps = start.isBefore(slotEnd) && end.isAfter(slotStart);
+                        if (overlaps) {
+                            hourlyCounts[hour]++;
+                        }
+                    }
+                });
+
+        List<Map<String, Object>> points = new ArrayList<>();
+        for (int hour = 0; hour < 24; hour++) {
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("hour", hour);
+            point.put("hourLabel", formatHourLabel(hour));
+            point.put("bookingCount", hourlyCounts[hour]);
+            points.add(point);
+        }
+
+        return points;
+    }
+
+    private LocalTime parseTimeSafely(String value) {
+        try {
+            return parseTime(value);
+        } catch (ResponseStatusException ex) {
+            return null;
+        }
+    }
+
+    private String formatHourLabel(int hour) {
+        int normalized = ((hour % 24) + 24) % 24;
+        int displayHour = normalized % 12 == 0 ? 12 : normalized % 12;
+        String meridiem = normalized >= 12 ? "PM" : "AM";
+        return displayHour + " " + meridiem;
     }
 
     public List<Booking> getAdminBookings(BookingStatus status, String resourceName, String bookingDate) {
@@ -385,6 +505,69 @@ public class CampusService {
 
     private boolean equalsIgnoreCase(String source, String value) {
         return source != null && source.equalsIgnoreCase(value);
+    }
+
+    private CapacityRule buildCapacityRule(String capacityFilter, Integer minCapacity) {
+        if (minCapacity != null && minCapacity <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minCapacity must be greater than zero.");
+        }
+
+        if (!isBlank(capacityFilter)) {
+            Matcher matcher = CAPACITY_FILTER_PATTERN.matcher(capacityFilter.trim());
+            if (!matcher.matches()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Invalid capacity filter. Use values like '> 50', '<= 30', or '100'."
+                );
+            }
+
+            int value = Integer.parseInt(matcher.group(2));
+            if (value <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Capacity filter must be greater than zero.");
+            }
+
+            String operator = matcher.group(1);
+            if (isBlank(operator)) {
+                operator = ">=";
+            }
+
+            return new CapacityRule(operator, value);
+        }
+
+        if (minCapacity == null) {
+            return null;
+        }
+
+        return new CapacityRule(">=", minCapacity);
+    }
+
+    private boolean matchesCapacity(Integer capacity, CapacityRule capacityRule) {
+        if (capacityRule == null) {
+            return true;
+        }
+
+        if (capacity == null) {
+            return false;
+        }
+
+        return switch (capacityRule.operator) {
+            case ">" -> capacity > capacityRule.value;
+            case ">=" -> capacity >= capacityRule.value;
+            case "<" -> capacity < capacityRule.value;
+            case "<=" -> capacity <= capacityRule.value;
+            case "=" -> capacity.equals(capacityRule.value);
+            default -> false;
+        };
+    }
+
+    private static final class CapacityRule {
+        private final String operator;
+        private final int value;
+
+        private CapacityRule(String operator, int value) {
+            this.operator = operator;
+            this.value = value;
+        }
     }
 
     private boolean isBlank(String value) {
