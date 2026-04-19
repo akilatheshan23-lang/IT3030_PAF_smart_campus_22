@@ -8,6 +8,8 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -41,6 +43,19 @@ public class TechnicianController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found."));
 
         return incidentService.listForTechnician(technician.getId());
+    }
+
+    @PutMapping("/tickets/{id}/resolve")
+    public Incident resolveTicket(@PathVariable("id") String ticketId, Authentication authentication) {
+        String email = extractEmail(authentication);
+        if (email == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+
+        TechnicianAccount technician = technicianAccountRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found."));
+
+        return incidentService.resolveTicket(ticketId, technician);
     }
 
     private String extractEmail(Authentication authentication) {

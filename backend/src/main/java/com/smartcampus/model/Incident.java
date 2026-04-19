@@ -19,6 +19,9 @@ public class Incident {
     private String assignedTechnicianName;
     private String assignedTechnicianEmail;
     private String assignedAt;
+    private String resolvedAt;
+    private String closedAt;
+    private String rejectionReason;
     private Priority priority;
     private IncidentStatus status;
     private String createdAt;
@@ -113,6 +116,30 @@ public class Incident {
 
     public void setAssignedAt(String assignedAt) {
         this.assignedAt = assignedAt;
+    }
+
+    public String getResolvedAt() {
+        return resolvedAt;
+    }
+
+    public void setResolvedAt(String resolvedAt) {
+        this.resolvedAt = resolvedAt;
+    }
+
+    public String getClosedAt() {
+        return closedAt;
+    }
+
+    public void setClosedAt(String closedAt) {
+        this.closedAt = closedAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 
     public Priority getPriority() {

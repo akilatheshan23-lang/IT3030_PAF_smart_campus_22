@@ -105,6 +105,15 @@ export default function UserDashboard() {
     return res ? res.name : resourceId
   }
 
+  const formatTicketStatus = (status) => {
+    if (!status) return ''
+    return String(status)
+      .toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
+
   const handleDeleteTicket = async (ticketId) => {
     if (!ticketId) return
     const confirmed = window.confirm('Delete this ticket? This cannot be undone.')
@@ -382,7 +391,14 @@ export default function UserDashboard() {
                       <td className="font-mono">{getResourceName(t.resourceId)}</td>
                       <td>{t.category}</td>
                       <td>{t.priority}</td>
-                      <td>{t.status}</td>
+                      <td>
+                        <span className={`status-badge ${String(t.status).toLowerCase()}`}>
+                          {formatTicketStatus(t.status)}
+                        </span>
+                        {t.rejectionReason && (
+                          <span className="reason-tooltip premium-tooltip" title={t.rejectionReason}> ℹ️</span>
+                        )}
+                      </td>
                       <td>
                         <button
                           type="button"
@@ -400,13 +416,15 @@ export default function UserDashboard() {
                       <td>{t.createdAt}</td>
                       <td>
                         <div style={{display: 'flex', gap: '8px'}}>
-                          <button
-                            type="button"
-                            className="btn-secondary small-btn"
-                            onClick={() => setEditTicket(t)}
-                          >
-                            Edit
-                          </button>
+                          {t.status !== 'RESOLVED' && t.status !== 'CLOSED' && (
+                            <button
+                              type="button"
+                              className="btn-secondary small-btn"
+                              onClick={() => setEditTicket(t)}
+                            >
+                              Edit
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="btn-danger small-btn ghost-danger"

@@ -2,6 +2,7 @@ package com.smartcampus.controller;
 
 import com.smartcampus.dto.BookingStatusUpdateRequest;
 import com.smartcampus.dto.TicketAssignmentRequest;
+import com.smartcampus.dto.TicketRejectionRequest;
 import com.smartcampus.model.Booking;
 import com.smartcampus.model.BookingStatus;
 import com.smartcampus.model.Incident;
@@ -74,5 +75,15 @@ public class AdminController {
                         org.springframework.http.HttpStatus.NOT_FOUND, "Technician not found."));
 
         return incidentService.assignTechnician(id, technician);
+    }
+
+    @PutMapping("/tickets/{id}/reject")
+    public Incident rejectTicket(@PathVariable String id, @Valid @RequestBody TicketRejectionRequest request) {
+        return incidentService.rejectTicket(id, request.getReason());
+    }
+
+    @PutMapping("/tickets/{id}/close")
+    public Incident closeTicket(@PathVariable String id) {
+        return incidentService.closeTicket(id);
     }
 }

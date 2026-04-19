@@ -37,6 +37,8 @@ export default function AdminPanel() {
   const [ticketAssignments, setTicketAssignments] = useState({})
   const [ticketError, setTicketError] = useState('')
   const [assigningTicketId, setAssigningTicketId] = useState('')
+  const [rejectingTicketId, setRejectingTicketId] = useState('')
+  const [closingTicketId, setClosingTicketId] = useState('')
   const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [], index: 0 })
   const [resources, setResources] = useState([])
   const [error, setError] = useState('')
@@ -162,6 +164,15 @@ export default function AdminPanel() {
     return r ? r.name : resourceId
   }
 
+  const formatTicketStatus = (status) => {
+    if (!status) return ''
+    return String(status)
+      .toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
+
   const handleFilterChange = (event) => {
     const nextFilters = {
       ...filters,
@@ -206,6 +217,41 @@ export default function AdminPanel() {
       setTicketError(err?.response?.data?.message || 'Failed to assign ticket.')
     } finally {
       setAssigningTicketId('')
+    }
+  }
+
+  const handleRejectTicket = async (ticketId) => {
+    const reason = window.prompt('Enter a reason for rejecting this ticket:')
+    if (!reason || !reason.trim()) {
+      window.alert('Rejection reason is required.')
+      return
+    }
+
+    setRejectingTicketId(ticketId)
+    setTicketError('')
+    try {
+      await campusApi.put(`/admin/tickets/${ticketId}/reject`, { reason })
+      await loadTickets()
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to reject ticket.')
+    } finally {
+      setRejectingTicketId('')
+    }
+  }
+
+  const handleCloseTicket = async (ticketId) => {
+    const confirmed = window.confirm('Close this ticket?')
+    if (!confirmed) return
+
+    setClosingTicketId(ticketId)
+    setTicketError('')
+    try {
+      await campusApi.put(`/admin/tickets/${ticketId}/close`)
+      await loadTickets()
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to close ticket.')
+    } finally {
+      setClosingTicketId('')
     }
   }
 
@@ -585,8 +631,11 @@ export default function AdminPanel() {
                       <td>{ticket.priority}</td>
                       <td>
                         <span className={`status-badge ${String(ticket.status).toLowerCase()}`}>
-                          {ticket.status}
+                          {formatTicketStatus(ticket.status)}
                         </span>
+                        {ticket.rejectionReason && (
+                          <span className="reason-tooltip premium-tooltip" title={ticket.rejectionReason}> ℹ️</span>
+                        )}
                       </td>
                       <td>
                         <button
@@ -614,6 +663,7 @@ export default function AdminPanel() {
                           <select
                             value={ticketAssignments[ticket.id] || ''}
                             onChange={(event) => handleTicketAssignmentChange(ticket.id, event.target.value)}
+                            disabled={['RESOLVED', 'CLOSED', 'REJECTED'].includes(ticket.status)}
                           >
                             <option value="">Select technician</option>
                             {technicians.map(tech => (
@@ -625,11 +675,33 @@ export default function AdminPanel() {
                           <button
                             type="button"
                             className="btn-primary small-btn"
-                            disabled={assigningTicketId === ticket.id}
+                            disabled={assigningTicketId === ticket.id || ['RESOLVED', 'CLOSED', 'REJECTED'].includes(ticket.status)}
                             onClick={() => handleAssignTicket(ticket.id)}
                           >
                             {assigningTicketId === ticket.id ? 'Assigning...' : 'Assign'}
                           </button>
+                        </div>
+                        <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
+                          {(ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') && (
+                            <button
+                              type="button"
+                              className="btn-danger small-btn ghost-danger"
+                              disabled={rejectingTicketId === ticket.id}
+                              onClick={() => handleRejectTicket(ticket.id)}
+                            >
+                              {rejectingTicketId === ticket.id ? 'Rejecting...' : 'Reject'}
+                            </button>
+                          )}
+                          {ticket.status === 'RESOLVED' && (
+                            <button
+                              type="button"
+                              className="btn-secondary small-btn"
+                              disabled={closingTicketId === ticket.id}
+                              onClick={() => handleCloseTicket(ticket.id)}
+                            >
+                              {closingTicketId === ticket.id ? 'Closing...' : 'Close'}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

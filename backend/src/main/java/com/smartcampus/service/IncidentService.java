@@ -105,11 +105,67 @@ public class IncidentService {
         Incident incident = incidentRepository.findById(ticketId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
 
+        if (incident.getStatus() == IncidentStatus.RESOLVED
+                || incident.getStatus() == IncidentStatus.CLOSED
+                || incident.getStatus() == IncidentStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot assign a closed, resolved, or rejected ticket.");
+        }
+
         incident.setAssignedTechnicianId(technician.getId());
         incident.setAssignedTechnicianName(technician.getName());
         incident.setAssignedTechnicianEmail(technician.getEmail());
         incident.setAssignedAt(Instant.now().toString());
+        incident.setStatus(IncidentStatus.IN_PROGRESS);
 
+        return incidentRepository.save(incident);
+    }
+
+    public Incident resolveTicket(String ticketId, TechnicianAccount technician) {
+        Incident incident = incidentRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
+
+        if (incident.getAssignedTechnicianId() == null
+                || !incident.getAssignedTechnicianId().equals(technician.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only resolve tickets assigned to you.");
+        }
+
+        if (incident.getStatus() != IncidentStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only in-progress tickets can be resolved.");
+        }
+
+        incident.setStatus(IncidentStatus.RESOLVED);
+        incident.setResolvedAt(Instant.now().toString());
+        return incidentRepository.save(incident);
+    }
+
+    public Incident closeTicket(String ticketId) {
+        Incident incident = incidentRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
+
+        if (incident.getStatus() != IncidentStatus.RESOLVED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only resolved tickets can be closed.");
+        }
+
+        incident.setStatus(IncidentStatus.CLOSED);
+        incident.setClosedAt(Instant.now().toString());
+        return incidentRepository.save(incident);
+    }
+
+    public Incident rejectTicket(String ticketId, String reason) {
+        Incident incident = incidentRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
+
+        if (incident.getStatus() == IncidentStatus.RESOLVED || incident.getStatus() == IncidentStatus.CLOSED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Resolved or closed tickets cannot be rejected.");
+        }
+
+        String trimmedReason = normalize(reason);
+        if (trimmedReason == null || trimmedReason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rejection reason is required.");
+        }
+
+        incident.setStatus(IncidentStatus.REJECTED);
+        incident.setRejectionReason(trimmedReason);
         return incidentRepository.save(incident);
     }
 

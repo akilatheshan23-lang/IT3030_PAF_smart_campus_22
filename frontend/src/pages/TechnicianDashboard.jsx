@@ -10,6 +10,7 @@ export default function TechnicianDashboard() {
   const [ticketLoading, setTicketLoading] = useState(true)
   const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [], index: 0 })
   const [resources, setResources] = useState([])
+  const [resolvingTicketId, setResolvingTicketId] = useState('')
   const navigate = useNavigate()
 
   const notifications = []
@@ -68,6 +69,19 @@ export default function TechnicianDashboard() {
     }
   }
 
+  const handleResolveTicket = async (ticketId) => {
+    setResolvingTicketId(ticketId)
+    setTicketError('')
+    try {
+      await campusApi.put(`/technician/tickets/${ticketId}/resolve`)
+      await loadAssignedTickets()
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to resolve ticket.')
+    } finally {
+      setResolvingTicketId('')
+    }
+  }
+
   const handleLogout = async () => {
     try {
       await campusApi.post('/auth/logout')
@@ -89,6 +103,15 @@ export default function TechnicianDashboard() {
   const getTicketName = (ticket) => {
     const resource = resources.find(r => r.id === ticket.resourceId)
     return resource ? resource.name : (ticket.resourceId || ticket.id)
+  }
+
+  const formatTicketStatus = (status) => {
+    if (!status) return ''
+    return String(status)
+      .toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
   }
 
   if (authLoading) {
@@ -171,16 +194,17 @@ export default function TechnicianDashboard() {
                   <th>Status</th>
                   <th>Evidence</th>
                   <th>Assigned</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {ticketLoading ? (
                   <tr>
-                    <td colSpan="7" className="empty-state">Loading tickets...</td>
+                    <td colSpan="8" className="empty-state">Loading tickets...</td>
                   </tr>
                 ) : assignedTickets.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="empty-state">No tickets assigned yet.</td>
+                    <td colSpan="8" className="empty-state">No tickets assigned yet.</td>
                   </tr>
                 ) : (
                   assignedTickets.map(ticket => (
@@ -188,7 +212,14 @@ export default function TechnicianDashboard() {
                       <td className="font-mono">{getTicketName(ticket)}</td>
                       <td>{ticket.category}</td>
                       <td>{ticket.priority}</td>
-                      <td>{ticket.status}</td>
+                      <td>
+                        <span className={`status-badge ${String(ticket.status).toLowerCase()}`}>
+                          {formatTicketStatus(ticket.status)}
+                        </span>
+                        {ticket.rejectionReason && (
+                          <span className="reason-tooltip premium-tooltip" title={ticket.rejectionReason}> ℹ️</span>
+                        )}
+                      </td>
                       <td>
                         <button
                           type="button"
@@ -205,6 +236,18 @@ export default function TechnicianDashboard() {
                         </button>
                       </td>
                       <td>{ticket.assignedAt || ticket.createdAt}</td>
+                      <td>
+                        {ticket.status === 'IN_PROGRESS' && (
+                          <button
+                            type="button"
+                            className="btn-primary small-btn"
+                            disabled={resolvingTicketId === ticket.id}
+                            onClick={() => handleResolveTicket(ticket.id)}
+                          >
+                            {resolvingTicketId === ticket.id ? 'Resolving...' : 'Mark Resolved'}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
