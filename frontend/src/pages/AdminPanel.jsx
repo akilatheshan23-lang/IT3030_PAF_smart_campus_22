@@ -638,6 +638,42 @@ export default function AdminPanel() {
     ? Math.round((outOfServiceResourceCount / inventoryTotal) * 100)
     : 0
 
+  const buildTopBookedFromBookings = (sourceBookings) => {
+    const countByResource = {}
+
+    sourceBookings.forEach((booking) => {
+      const label = booking?.resourceName || booking?.resourceId || 'Unknown Resource'
+      countByResource[label] = (countByResource[label] || 0) + 1
+    })
+
+    return Object.entries(countByResource)
+      .map(([resourceName, bookingCount]) => ({ resourceName, bookingCount }))
+      .sort((a, b) => b.bookingCount - a.bookingCount || a.resourceName.localeCompare(b.resourceName))
+      .slice(0, 5)
+  }
+
+  const summaryTopBookedResources = Array.isArray(summary?.topBookedResources)
+    ? summary.topBookedResources
+      .map((item) => ({
+        resourceName: item?.resourceName || item?.resourceId || 'Unknown Resource',
+        bookingCount: Number(item?.bookingCount ?? 0)
+      }))
+      .filter((item) => item.bookingCount > 0)
+    : []
+  const preferredBookingSource = bookings.filter(
+    (booking) => booking?.status === 'APPROVED' || booking?.status === 'COMPLETED'
+  )
+  const fallbackBookingSource = bookings.filter((booking) => booking?.status !== 'CANCELLED')
+  const fallbackTopBookedResources = preferredBookingSource.length > 0
+    ? buildTopBookedFromBookings(preferredBookingSource)
+    : buildTopBookedFromBookings(fallbackBookingSource)
+  const topBookedResources = summaryTopBookedResources.length > 0
+    ? summaryTopBookedResources
+    : fallbackTopBookedResources
+  const highestBookingCount = topBookedResources.length > 0
+    ? Math.max(...topBookedResources.map((item) => item.bookingCount))
+    : 0
+
   return (
     <div className="admin-layout user-layout">
       <aside className="admin-sidebar user-sidebar">
@@ -892,6 +928,40 @@ export default function AdminPanel() {
               <small>Live inventory health snapshot</small>
             </article>
           </div>
+        </section>
+
+        <section className="admin-panel-box utilization-dashboard">
+          <div className="panel-top utilization-panel-top">
+            <div>
+              <span className="eyebrow">Utilization Analytics</span>
+              <h2>Top 5 Most Booked Resources</h2>
+              <p>Highest demand resources based on approved and completed bookings.</p>
+            </div>
+          </div>
+
+          {topBookedResources.length === 0 ? (
+            <p className="empty-state">No bookings available yet for utilization analytics.</p>
+          ) : (
+            <div className="booked-chart-list">
+              {topBookedResources.map((item, index) => {
+                const widthPercent = highestBookingCount > 0
+                  ? Math.round((item.bookingCount / highestBookingCount) * 100)
+                  : 0
+
+                return (
+                  <div className="booked-chart-row" key={`${item.resourceName}-${index}`}>
+                    <div className="booked-chart-label-row">
+                      <span className="booked-chart-label" title={item.resourceName}>{item.resourceName}</span>
+                      <span className="booked-chart-value">{item.bookingCount}</span>
+                    </div>
+                    <div className="booked-chart-track" aria-label={`${item.resourceName} booking count`}>
+                      <span style={{ width: `${widthPercent}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </section>
 
         

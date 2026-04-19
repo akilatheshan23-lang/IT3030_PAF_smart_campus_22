@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -103,12 +104,47 @@ public class CampusService {
         data.put("totalResources", totalResources);
         data.put("activeResources", activeResources);
         data.put("outOfServiceResources", outOfServiceResources);
+        data.put("topBookedResources", buildTopBookedResources());
         data.put("recentAlerts", List.of(
                 "Pending booking requests require review",
                 "Out-of-service resource should be monitored",
                 "Recent booking updates were processed successfully"
         ));
         return data;
+    }
+
+    private List<Map<String, Object>> buildTopBookedResources() {
+        Map<String, Long> countByResourceId = new LinkedHashMap<>();
+        Map<String, String> labelByResourceId = new HashMap<>();
+
+        bookingRepository.findAll().stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.APPROVED
+                        || booking.getStatus() == BookingStatus.COMPLETED)
+                .filter(booking -> !isBlank(booking.getResourceId()))
+                .forEach(booking -> {
+                    String resourceId = booking.getResourceId().trim();
+                    countByResourceId.put(resourceId, countByResourceId.getOrDefault(resourceId, 0L) + 1L);
+
+                    if (!isBlank(booking.getResourceName())) {
+                        labelByResourceId.put(resourceId, booking.getResourceName().trim());
+                    }
+                });
+
+        return countByResourceId.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue(Comparator.reverseOrder())
+                        .thenComparing(
+                                entry -> labelByResourceId.getOrDefault(entry.getKey(), entry.getKey()),
+                                String.CASE_INSENSITIVE_ORDER
+                        ))
+                .limit(5)
+                .map(entry -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("resourceId", entry.getKey());
+                    item.put("resourceName", labelByResourceId.getOrDefault(entry.getKey(), entry.getKey()));
+                    item.put("bookingCount", entry.getValue());
+                    return item;
+                })
+                .toList();
     }
 
     public List<Booking> getAdminBookings(BookingStatus status, String resourceName, String bookingDate) {
