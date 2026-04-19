@@ -381,14 +381,15 @@ export default function UserDashboard() {
                   <th>Resource</th>
                   <th>Date & Time</th>
                   <th>Status</th>
+                  <th>Decision</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan="5" className="empty-state">Loading...</td></tr>
+                  <tr><td colSpan="6" className="empty-state">Loading...</td></tr>
                 ) : historyBookings.length === 0 ? (
-                  <tr><td colSpan="5" className="empty-state">No history yet.</td></tr>
+                  <tr><td colSpan="6" className="empty-state">No history yet.</td></tr>
                 ) : (
                   historyBookings.map(b => (
                     <tr key={b.id} className="table-row-hover">
@@ -396,6 +397,7 @@ export default function UserDashboard() {
                       <td className="font-semibold">{b.resourceName}</td>
                       <td>{b.bookingDate} ({b.startTime})</td>
                       <td><span className={`status ${String(b.status).toLowerCase()} pill-status`}>{b.status}</span></td>
+                      <td style={{ color: '#64748b', fontSize: '0.9rem' }}>{b.decisionReason || '-'}</td>
                       <td>
                         {(b.status === 'PENDING' || b.status === 'APPROVED') && (
                           <button className="btn-danger small-btn ghost-danger" onClick={() => triggerCancel(b.id)}>Cancel</button>
