@@ -177,8 +177,8 @@ export default function TechnicianDashboard() {
 
         <section id="tickets" className="admin-panel-box glass-panel-soft">
           <div className="panel-top">
-            <div>
-              <span className="eyebrow">Module C</span>
+              <div>
+              <span className="eyebrow"></span>
               <h2>Maintenance & Incident Tickets</h2>
               <p>Monitor tickets assigned to you and update their status with resolution notes.</p>
             </div>
@@ -265,7 +265,7 @@ export default function TechnicianDashboard() {
         <section id="notifications" className="admin-panel-box glass-panel-soft">
           <div className="panel-top">
             <div>
-              <span className="eyebrow">Module D</span>
+              <span className="eyebrow"></span>
               <h2>Notifications</h2>
               <p>Track updates on ticket status changes and new comments.</p>
             </div>

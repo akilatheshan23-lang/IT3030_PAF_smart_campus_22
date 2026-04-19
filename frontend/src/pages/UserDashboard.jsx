@@ -220,8 +220,8 @@ export default function UserDashboard() {
 
         <section id="catalogue" className="user-section admin-panel-box glass-panel-soft">
           <div className="panel-top">
-            <div>
-              <span className="eyebrow">Module A</span>
+              <div>
+              <span className="eyebrow"></span>
               <h2>Facilities & Assets Catalogue</h2>
               <p>Preview bookable spaces and equipment with key metadata.</p>
             </div>
@@ -359,8 +359,8 @@ export default function UserDashboard() {
 
         <section id="tickets" className="user-section admin-panel-box glass-panel-soft">
           <div className="panel-top">
-            <div>
-              <span className="eyebrow">Module C</span>
+              <div>
+              <span className="eyebrow"></span>
               <h2>Maintenance & Incident Tickets</h2>
               <p>Track incident reports for your requested resources.</p>
             </div>
@@ -446,7 +446,7 @@ export default function UserDashboard() {
         <section id="notifications" className="user-section admin-panel-box glass-panel-soft">
           <div className="panel-top">
             <div>
-              <span className="eyebrow">Module D</span>
+              <span className="eyebrow"></span>
               <h2>Notifications</h2>
               <p>Stay updated on booking approvals and ticket status changes.</p>
             </div>
