@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
+import IncidentCommentsModal from '../components/IncidentCommentsModal'
 import {
   LogOut, LayoutDashboard, CalendarCheck, AlertTriangle,
   Search, Calendar, ChevronDown, ClipboardList
@@ -40,6 +41,7 @@ export default function AdminPanel() {
   const [rejectingTicketId, setRejectingTicketId] = useState('')
   const [closingTicketId, setClosingTicketId] = useState('')
   const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [], index: 0 })
+  const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
   const [resources, setResources] = useState([])
   const [error, setError] = useState('')
   const [resourceListError, setResourceListError] = useState('')
@@ -66,6 +68,8 @@ export default function AdminPanel() {
     date: ''
   })
   const navigate = useNavigate()
+  const currentEmail = localStorage.getItem('smart-campus-user-email') || ''
+  const currentRole = localStorage.getItem('smart-campus-role') || 'ADMIN'
 
   useEffect(() => {
     loadSummary()
@@ -162,6 +166,15 @@ export default function AdminPanel() {
   const getResourceName = (resourceId) => {
     const r = resources.find(res => res.id === resourceId)
     return r ? r.name : resourceId
+  }
+
+  const openCommentModal = (ticket) => {
+    if (!ticket?.id) return
+    setCommentModal({
+      open: true,
+      ticketId: ticket.id,
+      ticketLabel: getResourceName(ticket.resourceId)
+    })
   }
 
   const formatTicketStatus = (status) => {
@@ -608,6 +621,7 @@ export default function AdminPanel() {
                   <th className="table-header-custom">Priority</th>
                   <th className="table-header-custom">Status</th>
                   <th className="table-header-custom">Evidence</th>
+                  <th className="table-header-custom">Comments</th>
                   <th className="table-header-custom">Created</th>
                   <th className="table-header-custom">Assigned</th>
                   <th className="table-header-custom">Assign</th>
@@ -650,6 +664,15 @@ export default function AdminPanel() {
                           })}
                         >
                           {ticket.attachments?.length || 0} files
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-secondary small-btn"
+                          onClick={() => openCommentModal(ticket)}
+                        >
+                          Comments
                         </button>
                       </td>
                       <td>{ticket.createdAt}</td>
@@ -1073,6 +1096,16 @@ export default function AdminPanel() {
             )}
           </div>
         </div>
+      )}
+
+      {commentModal.open && (
+        <IncidentCommentsModal
+          ticketId={commentModal.ticketId}
+          ticketLabel={commentModal.ticketLabel}
+          currentEmail={currentEmail}
+          currentRole={currentRole}
+          onClose={() => setCommentModal({ open: false, ticketId: '', ticketLabel: '' })}
+        />
       )}
 
       {isResourceModalOpen && (

@@ -4,6 +4,7 @@ import campusApi from '../api/campusApi'
 import BookingModal from '../components/BookingModal'
 import ReportIncident from '../components/ReportIncident'
 import EditIncidentModal from '../components/EditIncidentModal'
+import IncidentCommentsModal from '../components/IncidentCommentsModal'
 
 export default function UserDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
@@ -23,9 +24,11 @@ export default function UserDashboard() {
   const [editTicket, setEditTicket] = useState(null)
   const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [] })
   const [deletingTicketId, setDeletingTicketId] = useState('')
+  const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
   const navigate = useNavigate()
   const userEmail = profile.email
   const userName = profile.name
+  const currentRole = localStorage.getItem('smart-campus-role') || 'USER'
   const notifications = []
 
   useEffect(() => {
@@ -98,6 +101,15 @@ export default function UserDashboard() {
   const openReportModal = (resourceId) => {
     setReportResourceId(resourceId || '')
     setReportModalOpen(true)
+  }
+
+  const openCommentModal = (ticket) => {
+    if (!ticket?.id) return
+    setCommentModal({
+      open: true,
+      ticketId: ticket.id,
+      ticketLabel: getResourceName(ticket.resourceId)
+    })
   }
 
   const getResourceName = (resourceId) => {
@@ -416,6 +428,13 @@ export default function UserDashboard() {
                       <td>{t.createdAt}</td>
                       <td>
                         <div style={{display: 'flex', gap: '8px'}}>
+                          <button
+                            type="button"
+                            className="btn-secondary small-btn ghost"
+                            onClick={() => openCommentModal(t)}
+                          >
+                            Comments
+                          </button>
                           {t.status !== 'RESOLVED' && t.status !== 'CLOSED' && (
                             <button
                               type="button"
@@ -558,6 +577,16 @@ export default function UserDashboard() {
             </button>
           </div>
         </div>
+      )}
+
+      {commentModal.open && (
+        <IncidentCommentsModal
+          ticketId={commentModal.ticketId}
+          ticketLabel={commentModal.ticketLabel}
+          currentEmail={userEmail}
+          currentRole={currentRole}
+          onClose={() => setCommentModal({ open: false, ticketId: '', ticketLabel: '' })}
+        />
       )}
     </div>
   )

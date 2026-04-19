@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
+import IncidentCommentsModal from '../components/IncidentCommentsModal'
 
 export default function TechnicianDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
@@ -11,7 +12,11 @@ export default function TechnicianDashboard() {
   const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [], index: 0 })
   const [resources, setResources] = useState([])
   const [resolvingTicketId, setResolvingTicketId] = useState('')
+  const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
   const navigate = useNavigate()
+
+  const currentEmail = profile.email
+  const currentRole = localStorage.getItem('smart-campus-role') || 'TECHNICIAN'
 
   const notifications = []
 
@@ -103,6 +108,15 @@ export default function TechnicianDashboard() {
   const getTicketName = (ticket) => {
     const resource = resources.find(r => r.id === ticket.resourceId)
     return resource ? resource.name : (ticket.resourceId || ticket.id)
+  }
+
+  const openCommentModal = (ticket) => {
+    if (!ticket?.id) return
+    setCommentModal({
+      open: true,
+      ticketId: ticket.id,
+      ticketLabel: getTicketName(ticket)
+    })
   }
 
   const formatTicketStatus = (status) => {
@@ -237,16 +251,25 @@ export default function TechnicianDashboard() {
                       </td>
                       <td>{ticket.assignedAt || ticket.createdAt}</td>
                       <td>
-                        {ticket.status === 'IN_PROGRESS' && (
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             type="button"
-                            className="btn-primary small-btn"
-                            disabled={resolvingTicketId === ticket.id}
-                            onClick={() => handleResolveTicket(ticket.id)}
+                            className="btn-secondary small-btn"
+                            onClick={() => openCommentModal(ticket)}
                           >
-                            {resolvingTicketId === ticket.id ? 'Resolving...' : 'Mark Resolved'}
+                            Comments
                           </button>
-                        )}
+                          {ticket.status === 'IN_PROGRESS' && (
+                            <button
+                              type="button"
+                              className="btn-primary small-btn"
+                              disabled={resolvingTicketId === ticket.id}
+                              onClick={() => handleResolveTicket(ticket.id)}
+                            >
+                              {resolvingTicketId === ticket.id ? 'Resolving...' : 'Mark Resolved'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -328,6 +351,16 @@ export default function TechnicianDashboard() {
             )}
           </div>
         </div>
+      )}
+
+      {commentModal.open && (
+        <IncidentCommentsModal
+          ticketId={commentModal.ticketId}
+          ticketLabel={commentModal.ticketLabel}
+          currentEmail={currentEmail}
+          currentRole={currentRole}
+          onClose={() => setCommentModal({ open: false, ticketId: '', ticketLabel: '' })}
+        />
       )}
     </div>
   )

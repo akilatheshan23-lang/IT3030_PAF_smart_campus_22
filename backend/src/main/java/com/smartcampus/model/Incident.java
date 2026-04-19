@@ -25,6 +25,7 @@ public class Incident {
     private Priority priority;
     private IncidentStatus status;
     private String createdAt;
+    private List<IncidentComment> comments;
 
     public Incident() {
     }
@@ -164,5 +165,13 @@ public class Incident {
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public List<IncidentComment> getComments() {
+        return comments;
+    }
+
+    public void setComments(List<IncidentComment> comments) {
+        this.comments = comments;
     }
 }

@@ -6,6 +6,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.smartcampus.dto.IncidentCreateRequest;
 import com.smartcampus.dto.IncidentUpdateRequest;
 import com.smartcampus.model.Incident;
+import com.smartcampus.model.IncidentComment;
 import com.smartcampus.model.IncidentStatus;
 import com.smartcampus.model.Priority;
 import com.smartcampus.model.TechnicianAccount;
@@ -32,6 +34,7 @@ public class IncidentService {
             "image/webp",
             "image/gif"
     );
+        private static final int MAX_COMMENT_LENGTH = 1000;
 
     private final IncidentRepository incidentRepository;
     private final com.smartcampus.repository.BookingRepository bookingRepository;
@@ -39,6 +42,42 @@ public class IncidentService {
     public IncidentService(IncidentRepository incidentRepository, com.smartcampus.repository.BookingRepository bookingRepository) {
         this.incidentRepository = incidentRepository;
         this.bookingRepository = bookingRepository;
+    }
+
+    public static final class CommentActor {
+        private final String email;
+        private final String name;
+        private final String role;
+        private final boolean admin;
+        private final boolean technician;
+
+        public CommentActor(String email, String name, String role, boolean admin, boolean technician) {
+            this.email = email;
+            this.name = name;
+            this.role = role;
+            this.admin = admin;
+            this.technician = technician;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getRole() {
+            return role;
+        }
+
+        public boolean isAdmin() {
+            return admin;
+        }
+
+        public boolean isTechnician() {
+            return technician;
+        }
     }
 
     public Incident createIncident(String requesterEmail, IncidentCreateRequest request) {
@@ -247,6 +286,81 @@ public class IncidentService {
         incidentRepository.deleteById(ticketId);
     }
 
+    public List<IncidentComment> listComments(String ticketId, CommentActor actor) {
+        Incident incident = incidentRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
+
+        authorizeCommentAccess(incident, actor);
+        return List.copyOf(getOrCreateComments(incident));
+    }
+
+    public List<IncidentComment> addComment(String ticketId, CommentActor actor, String body) {
+        Incident incident = incidentRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
+
+        authorizeCommentAccess(incident, actor);
+
+        String normalizedBody = normalize(body);
+        if (normalizedBody == null || normalizedBody.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comment cannot be blank.");
+        }
+        if (normalizedBody.length() > MAX_COMMENT_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comment must be 1000 characters or less.");
+        }
+
+        IncidentComment comment = new IncidentComment();
+        comment.setId(UUID.randomUUID().toString());
+        comment.setAuthorEmail(actor.getEmail());
+        comment.setAuthorName(actor.getName() != null ? actor.getName() : actor.getEmail());
+        comment.setAuthorRole(actor.getRole());
+        comment.setBody(normalizedBody);
+        comment.setCreatedAt(Instant.now().toString());
+
+        List<IncidentComment> comments = getOrCreateComments(incident);
+        comments.add(comment);
+        incident.setComments(comments);
+        Incident saved = incidentRepository.save(incident);
+        return List.copyOf(getOrCreateComments(saved));
+    }
+
+    public List<IncidentComment> updateComment(String ticketId, String commentId, CommentActor actor, String body) {
+        Incident incident = incidentRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
+
+        authorizeCommentAccess(incident, actor);
+        IncidentComment comment = findComment(incident, commentId);
+        enforceCommentOwnership(comment, actor);
+
+        String normalizedBody = normalize(body);
+        if (normalizedBody == null || normalizedBody.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comment cannot be blank.");
+        }
+        if (normalizedBody.length() > MAX_COMMENT_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comment must be 1000 characters or less.");
+        }
+
+        comment.setBody(normalizedBody);
+        comment.setUpdatedAt(Instant.now().toString());
+
+        Incident saved = incidentRepository.save(incident);
+        return List.copyOf(getOrCreateComments(saved));
+    }
+
+    public List<IncidentComment> deleteComment(String ticketId, String commentId, CommentActor actor) {
+        Incident incident = incidentRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
+
+        authorizeCommentAccess(incident, actor);
+        IncidentComment comment = findComment(incident, commentId);
+        enforceCommentDelete(comment, actor);
+
+        List<IncidentComment> comments = getOrCreateComments(incident);
+        comments.removeIf(existing -> commentId.equals(existing.getId()));
+        incident.setComments(comments);
+        Incident saved = incidentRepository.save(incident);
+        return List.copyOf(getOrCreateComments(saved));
+    }
+
     private void enforceOwnership(Incident incident, String normalizedEmail) {
         String owner = normalizeEmail(incident.getRequesterEmail());
         if (owner != null) {
@@ -266,6 +380,65 @@ public class IncidentService {
         if (!hasBooking) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only modify your own tickets.");
         }
+    }
+
+    private void authorizeCommentAccess(Incident incident, CommentActor actor) {
+        if (actor == null || actor.getEmail() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+
+        if (actor.isAdmin()) {
+            return;
+        }
+
+        if (actor.isTechnician()) {
+            String assignedEmail = normalizeEmail(incident.getAssignedTechnicianEmail());
+            if (assignedEmail == null || !assignedEmail.equals(actor.getEmail())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only comment on tickets assigned to you.");
+            }
+            return;
+        }
+
+        enforceOwnership(incident, actor.getEmail());
+    }
+
+    private void enforceCommentOwnership(IncidentComment comment, CommentActor actor) {
+        String owner = normalizeEmail(comment.getAuthorEmail());
+        if (owner == null || !owner.equals(actor.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only edit your own comments.");
+        }
+    }
+
+    private void enforceCommentDelete(IncidentComment comment, CommentActor actor) {
+        if (actor.isAdmin()) {
+            return;
+        }
+
+        String owner = normalizeEmail(comment.getAuthorEmail());
+        if (owner == null || !owner.equals(actor.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only delete your own comments.");
+        }
+    }
+
+    private IncidentComment findComment(Incident incident, String commentId) {
+        if (commentId == null || commentId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comment ID is required.");
+        }
+
+        List<IncidentComment> comments = getOrCreateComments(incident);
+        return comments.stream()
+                .filter(comment -> commentId.equals(comment.getId()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found."));
+    }
+
+    private List<IncidentComment> getOrCreateComments(Incident incident) {
+        List<IncidentComment> comments = incident.getComments();
+        if (comments == null) {
+            comments = new ArrayList<>();
+            incident.setComments(comments);
+        }
+        return comments;
     }
 
     private String normalize(String v) {
