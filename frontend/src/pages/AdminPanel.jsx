@@ -95,6 +95,9 @@ export default function AdminPanel() {
     resource: '',
     date: ''
   })
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
+  const [rejectingBookingId, setRejectingBookingId] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
   const navigate = useNavigate()
   const currentEmail = localStorage.getItem('smart-campus-user-email') || ''
   const currentRole = localStorage.getItem('smart-campus-role') || 'ADMIN'
@@ -564,24 +567,42 @@ export default function AdminPanel() {
   }
 
   const handleStatusUpdate = async (bookingId, status) => {
-    let reason = ''
-
     if (status === 'REJECTED') {
-      reason = window.prompt('Enter rejection reason') || ''
-      if (!reason.trim()) {
-        window.alert('Reason is required for rejection.')
-        return
-      }
+      setRejectingBookingId(bookingId)
+      setRejectReason('')
+      setRejectModalOpen(true)
+      return
     }
 
     try {
       await campusApi.put(`/admin/bookings/${bookingId}/status`, {
         status,
-        reason
+        reason: ''
       })
       await loadSummary()
       await loadUtilizationHeatmap()
       await loadBookings(filters)
+    } catch (err) {
+      window.alert(err?.response?.data?.message || 'Status update failed.')
+    }
+  }
+
+  const confirmRejectBooking = async () => {
+    if (!rejectReason.trim()) {
+      window.alert('Reason is required for rejection.')
+      return
+    }
+
+    try {
+      await campusApi.put(`/admin/bookings/${rejectingBookingId}/status`, {
+        status: 'REJECTED',
+        reason: rejectReason
+      })
+      await loadSummary()
+      await loadBookings(filters)
+      setRejectModalOpen(false)
+      setRejectingBookingId(null)
+      setRejectReason('')
     } catch (err) {
       window.alert(err?.response?.data?.message || 'Status update failed.')
     }
@@ -1623,6 +1644,26 @@ export default function AdminPanel() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {rejectModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content popup-anim">
+            <button className="close-btn" onClick={() => { setRejectModalOpen(false); setRejectingBookingId(null); setRejectReason(''); }}>×</button>
+            <h2>Reject Booking</h2>
+            <div className="form-group">
+              <label>Reason</label>
+              <input
+                type="text"
+                placeholder="Enter rejection reason"
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                required
+              />
+            </div>
+            <button className="btn-danger full-width mt-4" onClick={confirmRejectBooking}>Confirm Rejection</button>
           </div>
         </div>
       )}
