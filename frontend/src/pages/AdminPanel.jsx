@@ -96,6 +96,12 @@ export default function AdminPanel() {
     loadResources()
     loadTickets()
     loadTechnicians()
+
+    const summaryRefreshInterval = window.setInterval(() => {
+      loadSummary()
+    }, 15000)
+
+    return () => window.clearInterval(summaryRefreshInterval)
   }, [])
 
   useEffect(() => {
@@ -619,6 +625,19 @@ export default function AdminPanel() {
     doc.save('booking_management_report.pdf')
   }
 
+  const totalResourceCount = Number(summary?.totalResources ?? 0)
+  const activeResourceCount = Number(summary?.activeResources ?? 0)
+  const outOfServiceResourceCount = Number(summary?.outOfServiceResources ?? 0)
+  const inventoryTotal = totalResourceCount > 0
+    ? totalResourceCount
+    : activeResourceCount + outOfServiceResourceCount
+  const activeResourcePercent = inventoryTotal > 0
+    ? Math.round((activeResourceCount / inventoryTotal) * 100)
+    : 0
+  const outOfServiceResourcePercent = inventoryTotal > 0
+    ? Math.round((outOfServiceResourceCount / inventoryTotal) * 100)
+    : 0
+
   return (
     <div className="admin-layout user-layout">
       <aside className="admin-sidebar user-sidebar">
@@ -832,6 +851,46 @@ export default function AdminPanel() {
           <div className="summary-card accent-dark wide-card booking-card" style={{background: 'linear-gradient(135deg, #1e1b4b, #312e81)'}}>
             <h3>{summary?.totalResources ?? 0}</h3>
             <p>Total Resources</p>
+          </div>
+        </section>
+
+        <section className="admin-panel-box inventory-dashboard">
+          <div className="panel-top inventory-panel-top">
+            <div>
+              <span className="eyebrow">Inventory Dashboard</span>
+              <h2>Asset status overview</h2>
+              <p>Visual breakdown of how many assets are ACTIVE vs OUT_OF_SERVICE.</p>
+            </div>
+          </div>
+
+          <div className="inventory-layout">
+            <article className="inventory-tile active-tile">
+              <div className="inventory-title-row">
+                <h3>ACTIVE</h3>
+                <span className="inventory-pill">{activeResourcePercent}%</span>
+              </div>
+              <p className="inventory-count">{activeResourceCount}</p>
+              <div className="inventory-progress" aria-label="Active asset ratio">
+                <span style={{ width: `${activeResourcePercent}%` }} />
+              </div>
+            </article>
+
+            <article className="inventory-tile out-of-service-tile">
+              <div className="inventory-title-row">
+                <h3>OUT_OF_SERVICE</h3>
+                <span className="inventory-pill">{outOfServiceResourcePercent}%</span>
+              </div>
+              <p className="inventory-count">{outOfServiceResourceCount}</p>
+              <div className="inventory-progress" aria-label="Out of service asset ratio">
+                <span style={{ width: `${outOfServiceResourcePercent}%` }} />
+              </div>
+            </article>
+
+            <article className="inventory-total-card">
+              <p>Total Assets</p>
+              <h3>{inventoryTotal}</h3>
+              <small>Live inventory health snapshot</small>
+            </article>
           </div>
         </section>
 

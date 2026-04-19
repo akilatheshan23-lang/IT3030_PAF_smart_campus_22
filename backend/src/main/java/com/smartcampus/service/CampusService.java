@@ -15,6 +15,9 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -35,13 +38,22 @@ public class CampusService {
 
     private static final DateTimeFormatter HH_MM_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final Pattern CAPACITY_FILTER_PATTERN = Pattern.compile("^(<=|>=|=|<|>)?\\s*(\\d+)\\s*$");
+    private static final Pattern ACTIVE_STATUS_PATTERN = Pattern.compile("^\\s*ACTIVE\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern OUT_OF_SERVICE_STATUS_PATTERN = Pattern.compile(
+            "^\\s*(OUT_OF_SERVICE|OUT OF SERVICE|OUT-OF-SERVICE)\\s*$",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final ResourceRepository resourceRepository;
     private final BookingRepository bookingRepository;
+    private final MongoTemplate mongoTemplate;
 
-    public CampusService(ResourceRepository resourceRepository, BookingRepository bookingRepository) {
+    public CampusService(ResourceRepository resourceRepository,
+                         BookingRepository bookingRepository,
+                         MongoTemplate mongoTemplate) {
         this.resourceRepository = resourceRepository;
         this.bookingRepository = bookingRepository;
+        this.mongoTemplate = mongoTemplate;
     }
 
     public Map<String, Object> getHomeOverview() {
@@ -73,12 +85,24 @@ public class CampusService {
     }
 
     public Map<String, Object> getAdminSummary() {
+        long activeResources = mongoTemplate.count(
+            new Query(Criteria.where("status").regex(ACTIVE_STATUS_PATTERN)),
+            Resource.class
+        );
+        long outOfServiceResources = mongoTemplate.count(
+            new Query(Criteria.where("status").regex(OUT_OF_SERVICE_STATUS_PATTERN)),
+            Resource.class
+        );
+        long totalResources = resourceRepository.count();
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("pendingBookings", bookingRepository.countByStatus(BookingStatus.PENDING));
         data.put("approvedBookings", bookingRepository.countByStatus(BookingStatus.APPROVED));
         data.put("rejectedBookings", bookingRepository.countByStatus(BookingStatus.REJECTED));
         data.put("cancelledBookings", bookingRepository.countByStatus(BookingStatus.CANCELLED));
-        data.put("totalResources", resourceRepository.count());
+        data.put("totalResources", totalResources);
+        data.put("activeResources", activeResources);
+        data.put("outOfServiceResources", outOfServiceResources);
         data.put("recentAlerts", List.of(
                 "Pending booking requests require review",
                 "Out-of-service resource should be monitored",

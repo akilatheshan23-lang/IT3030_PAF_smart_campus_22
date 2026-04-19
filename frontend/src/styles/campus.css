@@ -708,6 +708,121 @@ a {
   color: rgba(255, 255, 255, 0.8);
 }
 
+.inventory-dashboard {
+  background: linear-gradient(135deg, #f8fbff, #eef4ff);
+  border: 1px solid #d8e7ff;
+}
+
+.inventory-panel-top {
+  margin-bottom: 20px;
+}
+
+.inventory-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.8fr;
+  gap: 16px;
+}
+
+.inventory-tile,
+.inventory-total-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+}
+
+.inventory-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.inventory-title-row h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+}
+
+.inventory-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.inventory-count {
+  margin: 12px 0;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.inventory-progress {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.inventory-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+.active-tile .inventory-title-row h3,
+.active-tile .inventory-count {
+  color: #047857;
+}
+
+.active-tile .inventory-pill {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.active-tile .inventory-progress span {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.out-of-service-tile .inventory-title-row h3,
+.out-of-service-tile .inventory-count {
+  color: #b91c1c;
+}
+
+.out-of-service-tile .inventory-pill {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.out-of-service-tile .inventory-progress span {
+  background: linear-gradient(90deg, #f97316, #ef4444);
+}
+
+.inventory-total-card {
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.inventory-total-card p,
+.inventory-total-card small {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.inventory-total-card h3 {
+  margin: 8px 0 6px;
+  font-size: 2.2rem;
+}
+
 .admin-panel-box {
   margin-bottom: 24px;
   padding: 24px;
@@ -828,6 +943,10 @@ a {
 
   .summary-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .inventory-layout {
+    grid-template-columns: 1fr;
   }
 }
 
