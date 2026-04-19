@@ -105,6 +105,7 @@ public class CampusService {
         data.put("activeResources", activeResources);
         data.put("outOfServiceResources", outOfServiceResources);
         data.put("topBookedResources", buildTopBookedResources());
+        data.put("peakBookingHours", buildPeakBookingHours());
         data.put("recentAlerts", List.of(
                 "Pending booking requests require review",
                 "Out-of-service resource should be monitored",
@@ -145,6 +146,57 @@ public class CampusService {
                     return item;
                 })
                 .toList();
+    }
+
+    private List<Map<String, Object>> buildPeakBookingHours() {
+        int[] hourlyCounts = new int[24];
+
+        bookingRepository.findAll().stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.APPROVED
+                        || booking.getStatus() == BookingStatus.COMPLETED)
+                .forEach(booking -> {
+                    LocalTime start = parseTimeSafely(booking.getStartTime());
+                    LocalTime end = parseTimeSafely(booking.getEndTime());
+
+                    if (start == null || end == null || !end.isAfter(start)) {
+                        return;
+                    }
+
+                    for (int hour = 0; hour < 24; hour++) {
+                        LocalTime slotStart = LocalTime.of(hour, 0);
+                        LocalTime slotEnd = hour == 23 ? LocalTime.MAX : LocalTime.of(hour + 1, 0);
+                        boolean overlaps = start.isBefore(slotEnd) && end.isAfter(slotStart);
+                        if (overlaps) {
+                            hourlyCounts[hour]++;
+                        }
+                    }
+                });
+
+        List<Map<String, Object>> points = new ArrayList<>();
+        for (int hour = 0; hour < 24; hour++) {
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("hour", hour);
+            point.put("hourLabel", formatHourLabel(hour));
+            point.put("bookingCount", hourlyCounts[hour]);
+            points.add(point);
+        }
+
+        return points;
+    }
+
+    private LocalTime parseTimeSafely(String value) {
+        try {
+            return parseTime(value);
+        } catch (ResponseStatusException ex) {
+            return null;
+        }
+    }
+
+    private String formatHourLabel(int hour) {
+        int normalized = ((hour % 24) + 24) % 24;
+        int displayHour = normalized % 12 == 0 ? 12 : normalized % 12;
+        String meridiem = normalized >= 12 ? "PM" : "AM";
+        return displayHour + " " + meridiem;
     }
 
     public List<Booking> getAdminBookings(BookingStatus status, String resourceName, String bookingDate) {

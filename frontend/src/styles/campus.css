@@ -883,6 +883,66 @@ a {
   transition: width 0.3s ease;
 }
 
+.peak-hours-card {
+  margin-top: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.peak-hours-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.peak-hours-header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.peak-hours-header span {
+  color: #1d4ed8;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.peak-line-chart-wrap {
+  width: 100%;
+  height: 220px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #eff6ff, #ffffff);
+  border: 1px solid #dbeafe;
+  padding: 10px;
+}
+
+.peak-line-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.peak-line-chart polyline {
+  fill: none;
+  stroke: #2563eb;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.peak-line-axis {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .admin-panel-box {
   margin-bottom: 24px;
   padding: 24px;

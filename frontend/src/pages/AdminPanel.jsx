@@ -652,6 +652,62 @@ export default function AdminPanel() {
       .slice(0, 5)
   }
 
+  const formatPeakHourLabel = (hour) => {
+    const normalized = ((hour % 24) + 24) % 24
+    const displayHour = normalized % 12 === 0 ? 12 : normalized % 12
+    return `${displayHour} ${normalized >= 12 ? 'PM' : 'AM'}`
+  }
+
+  const normalizePeakHours = (sourceHours) => {
+    const baseline = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      hourLabel: formatPeakHourLabel(hour),
+      bookingCount: 0
+    }))
+
+    sourceHours.forEach((item, index) => {
+      const parsedHour = Number(item?.hour)
+      const safeHour = Number.isFinite(parsedHour)
+        ? Math.max(0, Math.min(23, Math.floor(parsedHour)))
+        : Math.max(0, Math.min(23, index))
+      const safeCount = Math.max(0, Number(item?.bookingCount ?? 0))
+
+      baseline[safeHour] = {
+        hour: safeHour,
+        hourLabel: String(item?.hourLabel || formatPeakHourLabel(safeHour)),
+        bookingCount: safeCount
+      }
+    })
+
+    return baseline
+  }
+
+  const buildPeakHoursFromBookings = (sourceBookings) => {
+    const hourlyCounts = Array.from({ length: 24 }, () => 0)
+
+    sourceBookings.forEach((booking) => {
+      const startRaw = String(booking?.startTime || '')
+      const endRaw = String(booking?.endTime || '')
+      const startHour = Number(startRaw.split(':')[0])
+      const endHour = Number(endRaw.split(':')[0])
+
+      if (!Number.isInteger(startHour) || !Number.isInteger(endHour) || startHour < 0 || startHour > 23 || endHour < 0 || endHour > 23) {
+        return
+      }
+
+      const normalizedEnd = endHour <= startHour ? startHour + 1 : endHour
+      for (let hour = startHour; hour < normalizedEnd && hour < 24; hour += 1) {
+        hourlyCounts[hour] += 1
+      }
+    })
+
+    return hourlyCounts.map((bookingCount, hour) => ({
+      hour,
+      hourLabel: formatPeakHourLabel(hour),
+      bookingCount
+    }))
+  }
+
   const summaryTopBookedResources = Array.isArray(summary?.topBookedResources)
     ? summary.topBookedResources
       .map((item) => ({
@@ -673,6 +729,29 @@ export default function AdminPanel() {
   const highestBookingCount = topBookedResources.length > 0
     ? Math.max(...topBookedResources.map((item) => item.bookingCount))
     : 0
+  const summaryPeakBookingHours = normalizePeakHours(Array.isArray(summary?.peakBookingHours) ? summary.peakBookingHours : [])
+  const fallbackPeakBookingHours = buildPeakHoursFromBookings(
+    preferredBookingSource.length > 0 ? preferredBookingSource : fallbackBookingSource
+  )
+  const hasSummaryPeakData = summaryPeakBookingHours.some((point) => point.bookingCount > 0)
+  const peakBookingHours = hasSummaryPeakData ? summaryPeakBookingHours : fallbackPeakBookingHours
+  const peakBookingMax = peakBookingHours.length > 0
+    ? Math.max(...peakBookingHours.map((point) => point.bookingCount))
+    : 0
+  const hasPeakBookingData = peakBookingMax > 0
+  const peakLinePoints = peakBookingHours
+    .map((point, index) => {
+      const x = (index / (peakBookingHours.length - 1 || 1)) * 100
+      const y = hasPeakBookingData
+        ? 100 - (point.bookingCount / peakBookingMax) * 100
+        : 100
+      return `${x},${y}`
+    })
+    .join(' ')
+  const peakHourTicks = [0, 6, 12, 18, 23].map((hour) => ({
+    hour,
+    label: peakBookingHours[hour]?.hourLabel || formatPeakHourLabel(hour)
+  }))
 
   return (
     <div className="admin-layout user-layout">
@@ -962,6 +1041,30 @@ export default function AdminPanel() {
               })}
             </div>
           )}
+
+          <div className="peak-hours-card">
+            <div className="peak-hours-header">
+              <h3>Peak Booking Hours</h3>
+              <span>{hasPeakBookingData ? `${peakBookingMax} peak concurrent bookings` : 'No booking trend yet'}</span>
+            </div>
+
+            {hasPeakBookingData ? (
+              <>
+                <div className="peak-line-chart-wrap">
+                  <svg className="peak-line-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Peak booking hours line graph">
+                    <polyline points={peakLinePoints} />
+                  </svg>
+                </div>
+                <div className="peak-line-axis">
+                  {peakHourTicks.map((tick) => (
+                    <span key={tick.hour}>{tick.label}</span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="empty-state">No bookings available to render peak booking hours.</p>
+            )}
+          </div>
         </section>
 
         
