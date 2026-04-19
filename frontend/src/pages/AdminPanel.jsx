@@ -1155,7 +1155,6 @@ export default function AdminPanel() {
             <table className="booking-table asset-table">
               <thead>
                 <tr>
-                  <th>Asset ID</th>
                   <th>Name</th>
                   <th>Type</th>
                   <th>Capacity</th>
@@ -1169,16 +1168,15 @@ export default function AdminPanel() {
               <tbody>
                 {isLoadingResources ? (
                   <tr>
-                    <td colSpan="9" className="empty-state">Loading assets...</td>
+                    <td colSpan="8" className="empty-state">Loading assets...</td>
                   </tr>
                 ) : resources.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="empty-state">No assets found.</td>
+                    <td colSpan="8" className="empty-state">No assets found.</td>
                   </tr>
                 ) : (
                   resources.map((resource) => (
                     <tr key={resource.id} className="table-row-hover">
-                      <td className="small-text font-mono">{resource.id}</td>
                       <td>{resource.name || '-'}</td>
                       <td>{resource.type || '-'}</td>
                       <td>{resource.capacity ?? '-'}</td>
