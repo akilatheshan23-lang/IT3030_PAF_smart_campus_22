@@ -3,10 +3,7 @@ package com.smartcampus.service;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-<<<<<<< HEAD
 import java.time.format.DateTimeFormatterBuilder;
-=======
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -236,7 +233,6 @@ public class CampusService {
     }
 
     public Booking createBooking(BookingRequest request) {
-<<<<<<< HEAD
         String requesterEmail = ensureNotBlank(request.getRequesterEmail(), "Requester email is required.");
         String requesterName = ensureNotBlank(request.getRequesterName(), "Requester name is required.");
         String resourceId = ensureNotBlank(request.getResourceId(), "Resource ID is required.");
@@ -247,16 +243,6 @@ public class CampusService {
         }
 
         LocalDate bookingDate = parseBookingDate(request.getBookingDate());
-
-=======
-        LocalDate bookingDate;
-        try {
-            bookingDate = LocalDate.parse(request.getBookingDate());
-        } catch (DateTimeParseException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date format. Use YYYY-MM-DD.");
-        }
-
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
         if (bookingDate.isBefore(LocalDate.now())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking date cannot be in the past.");
         }
@@ -270,7 +256,6 @@ public class CampusService {
 
         Booking booking = new Booking();
         booking.setBookingCode("BK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
-<<<<<<< HEAD
         booking.setRequesterName(requesterName);
         booking.setRequesterEmail(requesterEmail);
         booking.setResourceId(resourceId);
@@ -278,15 +263,6 @@ public class CampusService {
         booking.setBookingDate(bookingDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
         booking.setStartTime(start.format(HH_MM_FORMAT));
         booking.setEndTime(end.format(HH_MM_FORMAT));
-=======
-        booking.setRequesterName(request.getRequesterName());
-        booking.setRequesterEmail(request.getRequesterEmail());
-        booking.setResourceId(request.getResourceId());
-        booking.setResourceName(request.getResourceName());
-        booking.setBookingDate(request.getBookingDate());
-        booking.setStartTime(request.getStartTime());
-        booking.setEndTime(request.getEndTime());
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
         booking.setPurpose(request.getPurpose());
         booking.setAttendeeCount(request.getAttendeeCount());
         booking.setStatus(BookingStatus.PENDING);
@@ -303,11 +279,7 @@ public class CampusService {
         if (isBlank(email)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required to fetch bookings.");
         }
-<<<<<<< HEAD
         return bookingRepository.findByRequesterEmailIgnoreCaseOrderByBookingDateDesc(email);
-=======
-        return bookingRepository.findByRequesterEmailOrderByBookingDateDesc(email);
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
     }
 
     public Booking cancelUserBooking(String bookingId, String email, String reason) {
@@ -357,7 +329,6 @@ public class CampusService {
     }
 
     private LocalTime parseTime(String value) {
-<<<<<<< HEAD
         if (isBlank(value)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Time value is required.");
         }
@@ -405,12 +376,6 @@ public class CampusService {
                     }
                 }
             }
-=======
-        try {
-            return LocalTime.parse(value);
-        } catch (DateTimeParseException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid time format. Use HH:mm.");
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
         }
     }
 

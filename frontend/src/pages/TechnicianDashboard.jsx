@@ -6,7 +6,7 @@ import IncidentCommentsModal from '../components/IncidentCommentsModal'
 export default function TechnicianDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
   const [authLoading, setAuthLoading] = useState(true)
-  // Module C State Management [cite: 38, 42]
+  // Module C State Management
   const [assignedTickets, setAssignedTickets] = useState([])
   const [ticketError, setTicketError] = useState('')
   const [ticketLoading, setTicketLoading] = useState(true)
@@ -14,7 +14,6 @@ export default function TechnicianDashboard() {
   const [resources, setResources] = useState([])
   const [resolvingTicketId, setResolvingTicketId] = useState('')
   const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
-  
   const navigate = useNavigate()
   const notifications = [] // Placeholder for Module D [cite: 44]
 
@@ -41,7 +40,6 @@ export default function TechnicianDashboard() {
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
         setProfile({ email, name: name || email })
-        
         // Load operational data for Technician 
         await Promise.all([loadAssignedTickets(), loadResources()])
       } catch (err) {
@@ -77,20 +75,16 @@ export default function TechnicianDashboard() {
     }
   }
 
-  const handleResolveTicket = async (ticketId) => {
-    setResolvingTicketId(ticketId)
-    setTicketError('')
+  const handleUpdateStatus = async (id, newStatus) => {
     try {
-      // Endpoint for Ticket Workflow: IN_PROGRESS -> RESOLVED [cite: 41, 42]
-      await campusApi.put(`/technician/tickets/${ticketId}/resolve`)
-      await loadAssignedTickets()
+      await campusApi.put(`/technician/tickets/${id}/status`, null, {
+        params: { status: newStatus }
+      })
+      loadAssignedTickets()
     } catch (err) {
-      setTicketError(err?.response?.data?.message || 'Failed to resolve ticket.')
-    } finally {
-      setResolvingTicketId('')
+      alert('Failed to update ticket status')
     }
   }
-
   const handleLogout = async () => {
     try {
       await campusApi.post('/auth/logout')
@@ -220,14 +214,27 @@ export default function TechnicianDashboard() {
                   <tr><td colSpan="7" className="empty-state">No tickets assigned yet.</td></tr>
                 ) : (
                   assignedTickets.map(ticket => (
-                    <tr key={ticket.id}>
-                      <td className="font-mono">{getTicketName(ticket)}</td>
+                    <tr key={ticket.id} className="table-row-hover">
+                      <td className="font-mono"><strong>{ticket.ticketCode || getTicketName(ticket)}</strong></td>
                       <td>{ticket.category}</td>
-                      <td>{ticket.priority}</td>
                       <td>
-                        <span className={`status-badge ${String(ticket.status).toLowerCase()}`}>
-                          {formatTicketStatus(ticket.status)}
+                        <span style={{color: ticket.priority === 'HIGH' ? 'var(--danger)' : ticket.priority === 'MEDIUM' ? 'var(--warning)' : 'inherit', fontWeight: 'bold'}}>
+                          {ticket.priority}
                         </span>
+                      </td>
+                      <td>
+                        <select 
+                          className={`status ${String(ticket.status).toLowerCase()} pill-status`} 
+                          value={ticket.status} 
+                          onChange={(e) => handleUpdateStatus(ticket.id, e.target.value)}
+                          style={{ border: 'none', appearance: 'none', cursor: 'pointer', paddingRight: '20px' }}
+                        >
+                          <option value="OPEN">OPEN</option>
+                          <option value="IN_PROGRESS">IN_PROGRESS</option>
+                          <option value="RESOLVED">RESOLVED</option>
+                          <option value="CLOSED">CLOSED</option>
+                        </select>
+                        <span style={{marginLeft: '-15px', pointerEvents: 'none', fontSize: '0.7rem'}}>▼</span>
                       </td>
                       <td>
                         <button
@@ -241,29 +248,19 @@ export default function TechnicianDashboard() {
                             index: 0
                           })}
                         >
-                          {ticket.attachments?.length || 0} files [cite: 40]
+                          {ticket.attachments?.length || 0} files
                         </button>
                       </td>
-                      <td>{ticket.assignedAt || ticket.createdAt}</td>
+                      <td>{new Date(ticket.updatedAt || ticket.createdAt).toLocaleDateString()}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             type="button"
-                            className="btn-secondary small-btn"
+                            className="btn-secondary small-btn ghost"
                             onClick={() => openCommentModal(ticket)}
                           >
-                            Comments [cite: 43]
+                            Comments
                           </button>
-                          {ticket.status === 'IN_PROGRESS' && (
-                            <button
-                              type="button"
-                              className="btn-primary small-btn"
-                              disabled={resolvingTicketId === ticket.id}
-                              onClick={() => handleResolveTicket(ticket.id)}
-                            >
-                              {resolvingTicketId === ticket.id ? 'Resolving...' : 'Mark Resolved'}
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>

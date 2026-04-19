@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 import BookingModal from '../components/BookingModal'
+import ReportIssueModal from '../components/ReportIssueModal'
 // Module C Components
 import ReportIncident from '../components/ReportIncident'
 import EditIncidentModal from '../components/EditIncidentModal'
@@ -20,6 +21,7 @@ export default function UserDashboard() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelBookingId, setCancelBookingId] = useState(null)
   const [cancelReason, setCancelReason] = useState('')
+  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false)
   // Incident Reporting State
   const [reportModalOpen, setReportModalOpen] = useState(false)
   const [reportResourceId, setReportResourceId] = useState('')
@@ -55,7 +57,6 @@ export default function UserDashboard() {
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
         setProfile({ email, name: name || email })
-        
         // Load all required modules for User
         await Promise.all([loadBookings(), loadResources(), loadTickets()])
       } catch (err) {
@@ -95,6 +96,18 @@ export default function UserDashboard() {
       setResources(response.data)
     } catch (err) {
       console.error(err)
+    }
+  }
+
+
+
+  const handleReportIssue = async (issueData) => {
+    try {
+      await campusApi.post('/user/tickets', issueData)
+      setIsIssueModalOpen(false)
+      loadTickets()
+    } catch (err) {
+      alert('Failed to submit issue report.')
     }
   }
 
@@ -269,10 +282,12 @@ export default function UserDashboard() {
           )}
         </section>
 
-        <section id="upcoming" className="user-section">
-          <div className="section-header-row">
-            <h2>Upcoming Bookings</h2>
-            <span className="badge counter-badge">{upcomingBookings.length} Active</span>
+        <section id="upcoming" className="user-section" style={{ marginBottom: '40px' }}>
+          <div className="section-header-row" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: '#0f172a' }}>Upcoming Bookings</h2>
+            <span style={{ backgroundColor: '#e0e7ff', color: '#3730a3', padding: '6px 14px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '800' }}>
+              {upcomingBookings.length} Active
+            </span>
           </div>
 
           {upcomingBookings.length === 0 ? (
@@ -281,18 +296,69 @@ export default function UserDashboard() {
               <p>You have no upcoming approved bookings.</p>
             </div>
           ) : (
-            <div className="resource-grid premium-grid">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
               {upcomingBookings.map(b => (
-                <div key={b.id} className="resource-card booking-card premium-booking accent-green">
-                  <div className="resource-top">
-                    <span className="badge resource-badge">{b.resourceName}</span>
-                    <span className="status approved dot-status">APPROVED</span>
+                <div key={b.id} style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  border: '1px solid rgba(0,0,0,0.02)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ backgroundColor: '#e0e7ff', color: '#3730a3', padding: '8px 16px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '800' }}>
+                      {b.resourceName}
+                    </span>
+                    <span style={{ backgroundColor: '#dcfce7', color: '#166534', padding: '8px 16px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '800', letterSpacing: '0.05em' }}>
+                      APPROVED
+                    </span>
                   </div>
-                  <h3 className="booking-date">{b.bookingDate}</h3>
-                  <p>⏱ {b.startTime} - {b.endTime}</p>
-                  <p className="purpose-text">"{b.purpose}"</p>
-                  <button className="btn-danger full-width hover-lift mb-2" onClick={() => triggerCancel(b.id)}>Cancel Booking</button>
-                  <button className="btn-secondary full-width hover-lift" onClick={() => openReportModal(b.resourceId)}>Report Issue</button>
+                  <h3 style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: '800', color: '#0f172a' }}>
+                    {b.bookingDate}
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.95rem', gap: '8px' }}>
+                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                    <span>{b.startTime} - {b.endTime}</span>
+                  </div>
+                  <p style={{ margin: '0 0 12px 0', color: '#64748b', fontStyle: 'italic', fontSize: '0.95rem' }}>
+                    "{b.purpose}"
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button 
+                      className="hover-lift"
+                      style={{
+                        backgroundColor: '#da292e',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 28px',
+                        fontSize: '0.95rem',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        flex: '1'
+                      }}
+                      onClick={() => triggerCancel(b.id)}
+                    >
+                      Cancel Booking
+                    </button>
+                    <button 
+                      className="btn-secondary hover-lift"
+                      style={{
+                        borderRadius: '12px',
+                        padding: '12px 28px',
+                        fontSize: '0.95rem',
+                        fontWeight: '800',
+                        flex: '1'
+                      }}
+                      onClick={() => openReportModal(b.resourceId)}
+                    >
+                      Report Issue
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -345,12 +411,15 @@ export default function UserDashboard() {
         </section>
 
         <section id="tickets" className="user-section admin-panel-box glass-panel-soft">
-          <div className="panel-top">
+          <div className="panel-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <span className="eyebrow">Module C</span>
               <h2>Maintenance & Incident Tickets</h2>
               <p>Track incident reports for your requested resources.</p>
             </div>
+            <button className="btn-secondary auth-secondary-btn" onClick={() => setIsIssueModalOpen(true)}>
+              Report Issue
+            </button>
           </div>
 
           {tickets.length === 0 ? (
@@ -359,41 +428,34 @@ export default function UserDashboard() {
               <p>No incident tickets yet.</p>
             </div>
           ) : (
-            <div className="table-wrap">
-              <table className="booking-table user-table">
-                <thead>
-                  <tr>
-                    <th>Ticket</th>
-                    <th>Category</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Evidence</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tickets.map(t => (
-                    <tr key={t.id}>
-                      <td className="font-mono">{getResourceName(t.resourceId)}</td>
-                      <td>{t.category}</td>
-                      <td>{t.priority}</td>
-                      <td><span className={`status-badge ${String(t.status).toLowerCase()}`}>{formatTicketStatus(t.status)}</span></td>
-                      <td>
-                        <button className="btn-secondary small-btn" disabled={!t.attachments?.length} onClick={() => setAttachmentModal({ open: true, ticketId: t.id, attachments: t.attachments || [] })}>
-                          {t.attachments?.length || 0} files
-                        </button>
-                      </td>
-                      <td>
-                        <button className="btn-secondary small-btn ghost" onClick={() => openCommentModal(t)}>Comments</button>
-                        {t.status !== 'RESOLVED' && t.status !== 'CLOSED' && (
-                          <button className="btn-secondary small-btn ml-2" onClick={() => setEditTicket(t)}>Edit</button>
-                        )}
-                        <button className="btn-danger small-btn ghost-danger ml-2" disabled={deletingTicketId === t.id} onClick={() => handleDeleteTicket(t.id)}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="resource-grid premium-grid">
+              {tickets.map(ticket => (
+                <div key={ticket.id} className="resource-card booking-card">
+                  <div className="resource-top">
+                    <span className="badge">{ticket.ticketCode || getResourceName(ticket.resourceId)}</span>
+                    <span className={`status ${String(ticket.status).toLowerCase()} dot-status`}>
+                      {formatTicketStatus(ticket.status) || ticket.status}
+                    </span>
+                  </div>
+                  <h3 style={{ margin: '14px 0 6px 0', fontSize: '1.05rem' }}>{ticket.category} Update</h3>
+                  <div className="resource-meta" style={{ marginTop: '4px' }}>
+                    <span style={{ fontSize: '0.85rem' }}>Priority: <strong style={{ color: ticket.priority === 'HIGH' ? 'var(--danger)' : 'inherit' }}>{ticket.priority}</strong></span>
+                    <span style={{ fontSize: '0.85rem' }}>Loc: {ticket.resourceId || ticket.location}</span>
+                  </div>
+                  <p className="purpose-text" style={{ fontSize: '0.9rem', color: 'var(--text)' }}>"{ticket.description}"</p>
+                  
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                    <button className="btn-secondary small-btn" disabled={!ticket.attachments?.length} onClick={() => setAttachmentModal({ open: true, ticketId: ticket.id, attachments: ticket.attachments || [] })}>
+                      {ticket.attachments?.length || 0} files
+                    </button>
+                    <button className="btn-secondary small-btn ghost" onClick={() => openCommentModal(ticket)}>Comments</button>
+                    {ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED' && (
+                      <button className="btn-secondary small-btn" onClick={() => setEditTicket(ticket)}>Edit</button>
+                    )}
+                    <button className="btn-danger small-btn ghost-danger" disabled={deletingTicketId === ticket.id} onClick={() => handleDeleteTicket(ticket.id)}>Delete</button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </section>
@@ -442,6 +504,13 @@ export default function UserDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {isIssueModalOpen && (
+        <ReportIssueModal
+          onClose={() => setIsIssueModalOpen(false)}
+          onSubmit={handleReportIssue}
+        />
       )}
 
       {cancelModalOpen && (

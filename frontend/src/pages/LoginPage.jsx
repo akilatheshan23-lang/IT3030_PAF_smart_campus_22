@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { User, Wrench, UserPlus, ShieldAlert, LogIn } from 'lucide-react'
 import campusApi from '../api/campusApi'
 
 export default function LoginPage() {
@@ -72,7 +73,7 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card glass-panel popup-anim">
+      <div className="auth-card popup-anim">
         <div className="brand-wrap center-brand">
           <div className="brand-mark">SC</div>
           <div>
@@ -92,6 +93,7 @@ export default function LoginPage() {
           onClick={handleUserLogin}
           disabled={loading}
         >
+          {loading ? <LogIn size={20} className="spin" /> : <User size={20} />}
           {loading ? 'Checking session...' : 'Continue as User'}
         </button>
 
@@ -101,18 +103,21 @@ export default function LoginPage() {
           onClick={handleTechnicianLogin}
           disabled={loading}
         >
+          <Wrench size={20} className="text-secondary" />
           Continue as Technician
         </button>
 
         <Link to="/signup" className="btn-secondary full-width auth-btn auth-secondary-btn">
+          <UserPlus size={20} className="text-secondary" />
           Create account
         </Link>
 
         <Link to="/admin-login" className="btn-secondary full-width auth-btn auth-secondary-btn">
+          <ShieldAlert size={20} className="text-secondary" />
           Admin login
         </Link>
         
-        <p className="auth-footer">Use Google for user or technician access.</p>
+        <p className="auth-footer" style={{ marginTop: '30px' }}>Use Google for user or technician access.</p>
       </div>
     </div>
   )

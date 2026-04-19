@@ -28,19 +28,14 @@ public class MongoStartupVerifier implements ApplicationRunner {
         Document pingResult = mongoTemplate.executeCommand(new Document("ping", 1));
         String dbName = mongoTemplate.getDb().getName();
 
-<<<<<<< HEAD
         ensureTicketsCollection();
         ensureBookingsCollection();
-
-=======
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
         logger.info("MongoDB connected successfully. database='{}', uri='{}', ping='{}'",
                 dbName,
                 sanitizeUri(mongoUri),
                 pingResult.get("ok"));
     }
 
-<<<<<<< HEAD
     private void ensureTicketsCollection() {
         String collectionName = "tickets";
         if (!mongoTemplate.collectionExists(collectionName)) {
@@ -56,9 +51,6 @@ public class MongoStartupVerifier implements ApplicationRunner {
             logger.info("Created MongoDB collection '{}'", collectionName);
         }
     }
-
-=======
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
     private String sanitizeUri(String uri) {
         if (uri == null || uri.isBlank()) {
             return "<not-set>";

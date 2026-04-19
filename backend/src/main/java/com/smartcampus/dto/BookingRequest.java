@@ -6,24 +6,16 @@ import jakarta.validation.constraints.Positive;
 
 public class BookingRequest {
 
-<<<<<<< HEAD
-    private String requesterName;
-
-=======
     @NotBlank(message = "Requester name is required")
     private String requesterName;
 
     @NotBlank(message = "Requester email is required")
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
     private String requesterEmail;
 
     @NotBlank(message = "Resource ID is required")
     private String resourceId;
 
-<<<<<<< HEAD
-=======
     @NotBlank(message = "Resource name is required")
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
     private String resourceName;
 
     @NotBlank(message = "Booking date is required")
