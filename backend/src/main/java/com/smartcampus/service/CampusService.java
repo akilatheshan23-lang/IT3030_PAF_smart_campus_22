@@ -8,10 +8,12 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,6 +41,12 @@ public class CampusService {
 
     private static final DateTimeFormatter HH_MM_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final Pattern CAPACITY_FILTER_PATTERN = Pattern.compile("^(<=|>=|=|<|>)?\\s*(\\d+)\\s*$");
+    private static final Set<String> SUPPORTED_DEPARTMENTS = Set.of(
+        "faculty of computing",
+        "engineering department",
+        "faculty of business",
+        "architecture department"
+    );
     private static final Pattern ACTIVE_STATUS_PATTERN = Pattern.compile("^\\s*ACTIVE\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern OUT_OF_SERVICE_STATUS_PATTERN = Pattern.compile(
             "^\\s*(OUT_OF_SERVICE|OUT OF SERVICE|OUT-OF-SERVICE)\\s*$",
@@ -114,6 +122,58 @@ public class CampusService {
         return data;
     }
 
+    public List<Map<String, Object>> getDepartmentUtilizationHeatmap() {
+        LocalDate today = LocalDate.now();
+
+        List<Resource> activeResources = resourceRepository.findAll().stream()
+                .filter(resource -> resource.getStatus() == ResourceStatus.ACTIVE)
+                .toList();
+
+        Map<String, Integer> totalByDepartment = new LinkedHashMap<>();
+        Map<String, String> departmentByResourceId = new HashMap<>();
+
+        for (Resource resource : activeResources) {
+            String department = deriveDepartmentName(resource);
+            totalByDepartment.put(department, totalByDepartment.getOrDefault(department, 0) + 1);
+
+            if (!isBlank(resource.getId())) {
+                departmentByResourceId.put(resource.getId(), department);
+            }
+        }
+
+        Set<String> occupiedResourceIds = new HashSet<>();
+        bookingRepository.findByStatus(BookingStatus.APPROVED).stream()
+                .filter(booking -> isBookedToday(booking, today))
+                .filter(booking -> !isBlank(booking.getResourceId()))
+                .map(Booking::getResourceId)
+                .filter(departmentByResourceId::containsKey)
+                .forEach(occupiedResourceIds::add);
+
+        Map<String, Integer> occupiedByDepartment = new HashMap<>();
+        for (String occupiedResourceId : occupiedResourceIds) {
+            String department = departmentByResourceId.get(occupiedResourceId);
+            occupiedByDepartment.put(department, occupiedByDepartment.getOrDefault(department, 0) + 1);
+        }
+
+        List<Map<String, Object>> heatmap = new ArrayList<>();
+        totalByDepartment.forEach((department, totalResources) -> {
+            int occupiedResources = occupiedByDepartment.getOrDefault(department, 0);
+            int utilization = totalResources > 0
+                    ? (int) Math.round((occupiedResources * 100.0) / totalResources)
+                    : 0;
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("department", department);
+            item.put("utilization", utilization);
+            item.put("totalResources", totalResources);
+            item.put("occupiedResources", occupiedResources);
+            heatmap.add(item);
+        });
+
+        heatmap.sort(Comparator.comparing(item -> String.valueOf(item.get("department")), String.CASE_INSENSITIVE_ORDER));
+        return heatmap;
+    }
+
     private List<Map<String, Object>> buildTopBookedResources() {
         Map<String, Long> countByResourceId = new LinkedHashMap<>();
         Map<String, String> labelByResourceId = new HashMap<>();
@@ -146,6 +206,46 @@ public class CampusService {
                     return item;
                 })
                 .toList();
+    }
+
+    private boolean isBookedToday(Booking booking, LocalDate today) {
+        LocalDate bookingDate = parseBookingDateSafely(booking.getBookingDate());
+        return bookingDate != null && bookingDate.equals(today);
+    }
+
+    private LocalDate parseBookingDateSafely(String value) {
+        try {
+            return parseBookingDate(value);
+        } catch (ResponseStatusException ex) {
+            return null;
+        }
+    }
+
+    private String deriveDepartmentName(Resource resource) {
+        if (!isBlank(resource.getDepartment())) {
+            String normalizedDepartment = normalizeDepartment(resource.getDepartment());
+            if (isSupportedDepartment(normalizedDepartment)) {
+                return normalizedDepartment;
+            }
+        }
+
+        return "Unassigned";
+    }
+
+    private String normalizeDepartment(String department) {
+        if (isBlank(department)) {
+            return department;
+        }
+
+        String normalized = normalize(department);
+        if (equalsIgnoreCase(normalized, "Faculty of bussiness")) {
+            return "Faculty of Business";
+        }
+        return normalized;
+    }
+
+    private boolean isSupportedDepartment(String department) {
+        return !isBlank(department) && SUPPORTED_DEPARTMENTS.contains(department.toLowerCase(Locale.ROOT));
     }
 
     private List<Map<String, Object>> buildPeakBookingHours() {
@@ -233,15 +333,17 @@ public class CampusService {
         String name = ensureNotBlank(request.getName(), "Resource name is required.");
         String type = ensureNotBlank(request.getType(), "Resource type is required.");
         String location = ensureNotBlank(request.getLocation(), "Location is required.");
+        String department = normalizeDepartment(ensureNotBlank(request.getDepartment(), "Department is required."));
         String availabilityWindow = normalizeAvailabilityWindow(request.getAvailabilityWindow());
         ResourceStatus status = request.getStatus() != null ? request.getStatus() : ResourceStatus.ACTIVE;
-        validateNoDuplicateResource(null, name, type, location);
+        validateNoDuplicateResource(null, name, type, location, department);
 
         Resource resource = new Resource();
         resource.setName(name);
         resource.setType(type);
         resource.setCapacity(request.getCapacity());
         resource.setLocation(location);
+        resource.setDepartment(department);
         resource.setAvailabilityWindow(availabilityWindow);
         resource.setStatus(status);
         return resourceRepository.save(resource);
@@ -253,15 +355,17 @@ public class CampusService {
         String name = ensureNotBlank(request.getName(), "Resource name is required.");
         String type = ensureNotBlank(request.getType(), "Resource type is required.");
         String location = ensureNotBlank(request.getLocation(), "Location is required.");
+        String department = normalizeDepartment(ensureNotBlank(request.getDepartment(), "Department is required."));
         String availabilityWindow = normalizeAvailabilityWindow(request.getAvailabilityWindow());
         ResourceStatus status = request.getStatus() != null ? request.getStatus() : ResourceStatus.ACTIVE;
 
-        validateNoDuplicateResource(resourceId, name, type, location);
+        validateNoDuplicateResource(resourceId, name, type, location, department);
 
         resource.setName(name);
         resource.setType(type);
         resource.setCapacity(request.getCapacity());
         resource.setLocation(location);
+        resource.setDepartment(department);
         resource.setAvailabilityWindow(availabilityWindow);
         resource.setStatus(status);
 
@@ -273,6 +377,7 @@ public class CampusService {
                 && request.getType() == null
                 && request.getCapacity() == null
                 && request.getLocation() == null
+                && request.getDepartment() == null
                 && request.getAvailabilityWindow() == null
                 && request.getStatus() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -290,18 +395,22 @@ public class CampusService {
         String location = request.getLocation() != null
                 ? ensureNotBlank(request.getLocation(), "Location cannot be blank.")
                 : resource.getLocation();
+        String department = request.getDepartment() != null
+            ? normalizeDepartment(ensureNotBlank(request.getDepartment(), "Department cannot be blank."))
+            : normalizeDepartment(resource.getDepartment());
         String availabilityWindow = request.getAvailabilityWindow() != null
                 ? normalizeAvailabilityWindow(request.getAvailabilityWindow())
                 : resource.getAvailabilityWindow();
         Integer capacity = request.getCapacity() != null ? request.getCapacity() : resource.getCapacity();
         ResourceStatus status = request.getStatus() != null ? request.getStatus() : resource.getStatus();
 
-        validateNoDuplicateResource(resourceId, name, type, location);
+        validateNoDuplicateResource(resourceId, name, type, location, department);
 
         resource.setName(name);
         resource.setType(type);
         resource.setCapacity(capacity);
         resource.setLocation(location);
+        resource.setDepartment(department);
         resource.setAvailabilityWindow(availabilityWindow);
         resource.setStatus(status);
 
@@ -380,6 +489,7 @@ public class CampusService {
         booking.setRequesterEmail(requesterEmail);
         booking.setResourceId(resourceId);
         booking.setResourceName(resource.getName());
+        booking.setResourceDepartment(deriveDepartmentName(resource));
         booking.setBookingDate(bookingDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
         booking.setStartTime(start.format(HH_MM_FORMAT));
         booking.setEndTime(end.format(HH_MM_FORMAT));
@@ -579,12 +689,21 @@ public class CampusService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Resource not found."));
     }
 
-    private void validateNoDuplicateResource(String currentResourceId, String name, String type, String location) {
-        resourceRepository.findByNameIgnoreCaseAndTypeIgnoreCaseAndLocationIgnoreCase(name, type, location)
+    private void validateNoDuplicateResource(String currentResourceId,
+                                             String name,
+                                             String type,
+                                             String location,
+                                             String department) {
+        resourceRepository.findByNameIgnoreCaseAndTypeIgnoreCaseAndLocationIgnoreCaseAndDepartmentIgnoreCase(
+                        name,
+                        type,
+                        location,
+                        department
+                )
                 .ifPresent(existing -> {
                     if (!existing.getId().equals(currentResourceId)) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                "A resource with the same name, type, and location already exists.");
+                                "A resource with the same name, type, location, and department already exists.");
                     }
                 });
     }

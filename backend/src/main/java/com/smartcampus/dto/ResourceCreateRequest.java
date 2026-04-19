@@ -1,6 +1,7 @@
 package com.smartcampus.dto;
 
 import com.smartcampus.model.ResourceStatus;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -24,6 +25,13 @@ public class ResourceCreateRequest {
     @NotBlank(message = "Location is required")
     @Size(max = 120, message = "Location must be at most 120 characters")
     private String location;
+
+    @NotBlank(message = "Department is required")
+    @Pattern(
+            regexp = "^(Faculty of Computing|Engineering Department|Faculty of Business|Faculty of bussiness|Architecture Department)$",
+            message = "Department must be one of the supported options"
+    )
+    private String department;
 
     @NotBlank(message = "Availability window is required")
     @Pattern(regexp = "^\\d{2}:\\d{2}\\s-\\s\\d{2}:\\d{2}$", message = "Availability window must be in format HH:mm - HH:mm")
@@ -61,6 +69,14 @@ public class ResourceCreateRequest {
 
     public void setLocation(String location) {
         this.location = location;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
     }
 
     public String getAvailabilityWindow() {

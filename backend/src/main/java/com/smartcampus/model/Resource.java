@@ -12,6 +12,7 @@ public class Resource {
     private String type;
     private Integer capacity;
     private String location;
+    private String department;
     private String availabilityWindow;
     private ResourceStatus status;
 
@@ -19,10 +20,21 @@ public class Resource {
     }
 
     public Resource(String name, String type, Integer capacity, String location, String availabilityWindow, ResourceStatus status) {
+        this(name, type, capacity, location, null, availabilityWindow, status);
+    }
+
+    public Resource(String name,
+                    String type,
+                    Integer capacity,
+                    String location,
+                    String department,
+                    String availabilityWindow,
+                    ResourceStatus status) {
         this.name = name;
         this.type = type;
         this.capacity = capacity;
         this.location = location;
+        this.department = department;
         this.availabilityWindow = availabilityWindow;
         this.status = status;
     }
@@ -65,6 +77,14 @@ public class Resource {
 
     public void setLocation(String location) {
         this.location = location;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
     }
 
     public String getAvailabilityWindow() {

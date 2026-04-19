@@ -8,9 +8,19 @@ import com.smartcampus.model.Resource;
 import com.smartcampus.model.ResourceStatus;
 
 public interface ResourceRepository extends MongoRepository<Resource, String> {
-	boolean existsByNameIgnoreCaseAndTypeIgnoreCaseAndLocationIgnoreCase(String name, String type, String location);
+	boolean existsByNameIgnoreCaseAndTypeIgnoreCaseAndLocationIgnoreCaseAndDepartmentIgnoreCase(
+			String name,
+			String type,
+			String location,
+			String department
+	);
 
-	Optional<Resource> findByNameIgnoreCaseAndTypeIgnoreCaseAndLocationIgnoreCase(String name, String type, String location);
+	Optional<Resource> findByNameIgnoreCaseAndTypeIgnoreCaseAndLocationIgnoreCaseAndDepartmentIgnoreCase(
+			String name,
+			String type,
+			String location,
+			String department
+	);
 
 	long countByStatus(ResourceStatus status);
 }
