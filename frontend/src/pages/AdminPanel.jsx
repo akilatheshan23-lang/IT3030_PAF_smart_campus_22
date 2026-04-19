@@ -36,6 +36,17 @@ const parseAvailabilityWindow = (availabilityWindow) => {
   }
 }
 
+const formatAMPM = (timeStr) => {
+  if (!timeStr) return '';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  let h = parseInt(parts[0], 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  const paddedH = h < 10 ? `0${h}` : h;
+  return `${paddedH}:${parts[1]} ${ampm}`;
+};
+
 export default function AdminPanel() {
   const [summary, setSummary] = useState(null)
   const [bookings, setBookings] = useState([])
@@ -993,7 +1004,7 @@ export default function AdminPanel() {
                       </td>
                       <td style={{color: '#334155', fontWeight: '500'}}>{booking.resourceName}</td>
                       <td style={{color: '#475569'}}>{booking.bookingDate}</td>
-                      <td style={{color: '#475569'}}>{booking.startTime} - {booking.endTime}</td>
+                      <td style={{color: '#475569'}}>{formatAMPM(booking.startTime)} - {formatAMPM(booking.endTime)}</td>
                       <td style={{color: '#475569'}}>{booking.purpose}</td>
                       <td>
                         <span className={`status-badge ${String(booking.status).toLowerCase()}`}>
