@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ import com.smartcampus.repository.ResourceRepository;
 public class CampusService {
 
     private static final DateTimeFormatter HH_MM_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final Pattern CAPACITY_FILTER_PATTERN = Pattern.compile("^(<=|>=|=|<|>)?\\s*(\\d+)\\s*$");
 
     private final ResourceRepository resourceRepository;
     private final BookingRepository bookingRepository;
@@ -54,12 +57,17 @@ public class CampusService {
         return data;
     }
 
-    public List<Resource> getPublicResources(String type, String location, Integer minCapacity) {
+    public List<Resource> getPublicResources(String type,
+                                             String location,
+                                             Integer minCapacity,
+                                             String capacityFilter) {
+        CapacityRule capacityRule = buildCapacityRule(capacityFilter, minCapacity);
+
         return resourceRepository.findAll().stream()
                 .filter(resource -> resource.getStatus() == ResourceStatus.ACTIVE)
                 .filter(resource -> isBlank(type) || equalsIgnoreCase(resource.getType(), type))
                 .filter(resource -> isBlank(location) || containsIgnoreCase(resource.getLocation(), location))
-                .filter(resource -> minCapacity == null || resource.getCapacity() >= minCapacity)
+                .filter(resource -> matchesCapacity(resource.getCapacity(), capacityRule))
                 .sorted(Comparator.comparing(Resource::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
@@ -385,6 +393,69 @@ public class CampusService {
 
     private boolean equalsIgnoreCase(String source, String value) {
         return source != null && source.equalsIgnoreCase(value);
+    }
+
+    private CapacityRule buildCapacityRule(String capacityFilter, Integer minCapacity) {
+        if (minCapacity != null && minCapacity <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minCapacity must be greater than zero.");
+        }
+
+        if (!isBlank(capacityFilter)) {
+            Matcher matcher = CAPACITY_FILTER_PATTERN.matcher(capacityFilter.trim());
+            if (!matcher.matches()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Invalid capacity filter. Use values like '> 50', '<= 30', or '100'."
+                );
+            }
+
+            int value = Integer.parseInt(matcher.group(2));
+            if (value <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Capacity filter must be greater than zero.");
+            }
+
+            String operator = matcher.group(1);
+            if (isBlank(operator)) {
+                operator = ">=";
+            }
+
+            return new CapacityRule(operator, value);
+        }
+
+        if (minCapacity == null) {
+            return null;
+        }
+
+        return new CapacityRule(">=", minCapacity);
+    }
+
+    private boolean matchesCapacity(Integer capacity, CapacityRule capacityRule) {
+        if (capacityRule == null) {
+            return true;
+        }
+
+        if (capacity == null) {
+            return false;
+        }
+
+        return switch (capacityRule.operator) {
+            case ">" -> capacity > capacityRule.value;
+            case ">=" -> capacity >= capacityRule.value;
+            case "<" -> capacity < capacityRule.value;
+            case "<=" -> capacity <= capacityRule.value;
+            case "=" -> capacity.equals(capacityRule.value);
+            default -> false;
+        };
+    }
+
+    private static final class CapacityRule {
+        private final String operator;
+        private final int value;
+
+        private CapacityRule(String operator, int value) {
+            this.operator = operator;
+            this.value = value;
+        }
     }
 
     private boolean isBlank(String value) {
