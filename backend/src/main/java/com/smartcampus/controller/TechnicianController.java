@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.smartcampus.model.Incident;
-import com.smartcampus.model.TechnicianAccount;
-import com.smartcampus.repository.TechnicianAccountRepository;
+import com.smartcampus.model.UserAccount;
+import com.smartcampus.repository.UserAccountRepository;
 import com.smartcampus.service.IncidentService;
 
 @RestController
@@ -24,12 +24,12 @@ import com.smartcampus.service.IncidentService;
 public class TechnicianController {
 
     private final IncidentService incidentService;
-    private final TechnicianAccountRepository technicianAccountRepository;
+    private final UserAccountRepository userAccountRepository;
 
     public TechnicianController(IncidentService incidentService,
-                                TechnicianAccountRepository technicianAccountRepository) {
+                                UserAccountRepository userAccountRepository) {
         this.incidentService = incidentService;
-        this.technicianAccountRepository = technicianAccountRepository;
+        this.userAccountRepository = userAccountRepository;
     }
 
     @GetMapping("/tickets")
@@ -39,7 +39,7 @@ public class TechnicianController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
         }
 
-        TechnicianAccount technician = technicianAccountRepository.findByEmail(email)
+        UserAccount technician = userAccountRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found."));
 
         return incidentService.listForTechnician(technician.getId());
@@ -52,7 +52,7 @@ public class TechnicianController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
         }
 
-        TechnicianAccount technician = technicianAccountRepository.findByEmail(email)
+        UserAccount technician = userAccountRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found."));
 
         return incidentService.resolveTicket(ticketId, technician);

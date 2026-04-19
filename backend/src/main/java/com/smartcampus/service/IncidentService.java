@@ -19,7 +19,7 @@ import com.smartcampus.model.Incident;
 import com.smartcampus.model.IncidentComment;
 import com.smartcampus.model.IncidentStatus;
 import com.smartcampus.model.Priority;
-import com.smartcampus.model.TechnicianAccount;
+import com.smartcampus.model.UserAccount;
 import com.smartcampus.repository.IncidentRepository;
 
 @Service
@@ -140,7 +140,7 @@ public class IncidentService {
         return incidentRepository.findByAssignedTechnicianIdOrderByCreatedAtDesc(technicianId);
     }
 
-    public Incident assignTechnician(String ticketId, TechnicianAccount technician) {
+    public Incident assignTechnician(String ticketId, UserAccount technician) {
         Incident incident = incidentRepository.findById(ticketId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
 
@@ -159,7 +159,7 @@ public class IncidentService {
         return incidentRepository.save(incident);
     }
 
-    public Incident resolveTicket(String ticketId, TechnicianAccount technician) {
+    public Incident resolveTicket(String ticketId, UserAccount technician) {
         Incident incident = incidentRepository.findById(ticketId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found."));
 

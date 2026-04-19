@@ -1,21 +1,16 @@
 package com.smartcampus.controller;
 
 import com.smartcampus.dto.BookingStatusUpdateRequest;
-<<<<<<< HEAD
 import com.smartcampus.dto.TicketAssignmentRequest;
 import com.smartcampus.dto.TicketRejectionRequest;
 import com.smartcampus.model.Booking;
 import com.smartcampus.model.BookingStatus;
 import com.smartcampus.model.Incident;
-import com.smartcampus.model.TechnicianAccount;
-import com.smartcampus.repository.TechnicianAccountRepository;
+import com.smartcampus.model.UserAccount;
+import com.smartcampus.model.UserRole;
+import com.smartcampus.repository.UserAccountRepository;
 import com.smartcampus.service.CampusService;
 import com.smartcampus.service.IncidentService;
-=======
-import com.smartcampus.model.Booking;
-import com.smartcampus.model.BookingStatus;
-import com.smartcampus.service.CampusService;
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,21 +28,15 @@ import java.util.Map;
 public class AdminController {
 
     private final CampusService campusService;
-<<<<<<< HEAD
     private final IncidentService incidentService;
-    private final TechnicianAccountRepository technicianAccountRepository;
+    private final UserAccountRepository userAccountRepository;
 
     public AdminController(CampusService campusService,
                            IncidentService incidentService,
-                           TechnicianAccountRepository technicianAccountRepository) {
+                           UserAccountRepository userAccountRepository) {
         this.campusService = campusService;
         this.incidentService = incidentService;
-        this.technicianAccountRepository = technicianAccountRepository;
-=======
-
-    public AdminController(CampusService campusService) {
-        this.campusService = campusService;
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
+        this.userAccountRepository = userAccountRepository;
     }
 
     @GetMapping("/dashboard/summary")
@@ -68,22 +57,22 @@ public class AdminController {
     public Booking updateStatus(@PathVariable String id, @Valid @RequestBody BookingStatusUpdateRequest request) {
         return campusService.updateBookingStatus(id, request);
     }
-<<<<<<< HEAD
-
     @GetMapping("/tickets")
     public List<Incident> getTickets() {
         return incidentService.listAll();
     }
 
     @GetMapping("/technicians")
-    public List<TechnicianAccount> getTechnicians() {
-        return technicianAccountRepository.findAll();
+    public List<UserAccount> getTechnicians() {
+        return userAccountRepository.findAll().stream()
+                .filter(u -> u.getRole() == UserRole.ROLE_TECHNICIAN)
+                .toList();
     }
 
     @PutMapping("/tickets/{id}/assign")
     public Incident assignTicket(@PathVariable String id,
                                  @Valid @RequestBody TicketAssignmentRequest request) {
-        TechnicianAccount technician = technicianAccountRepository.findById(request.getTechnicianId())
+        UserAccount technician = userAccountRepository.findById(request.getTechnicianId())
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "Technician not found."));
 
@@ -99,6 +88,4 @@ public class AdminController {
     public Incident closeTicket(@PathVariable String id) {
         return incidentService.closeTicket(id);
     }
-=======
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
 }

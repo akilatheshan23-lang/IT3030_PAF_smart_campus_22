@@ -53,7 +53,7 @@ public class TicketController {
         return ResponseEntity.ok(tickets);
     }
 
-    @GetMapping("/technician/tickets")
+    @GetMapping("/technician/all-tickets")
     public ResponseEntity<List<IncidentTicket>> getAllTickets() {
         // Technically this should be protected by HasRole("TECHNICIAN") or "ADMIN",
         // but we rely on the main config for path protections.

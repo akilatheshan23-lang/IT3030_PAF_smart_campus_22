@@ -4,13 +4,10 @@ import com.smartcampus.dto.BookingRequest;
 import com.smartcampus.model.Booking;
 import com.smartcampus.service.CampusService;
 import jakarta.validation.Valid;
-<<<<<<< HEAD
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
-=======
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,7 +31,6 @@ public class UserController {
     }
 
     @PostMapping("/bookings")
-<<<<<<< HEAD
     public Booking createBooking(Authentication authentication,
                                  @Valid @RequestBody BookingRequest request) {
         String email = extractEmail(authentication);
@@ -45,35 +41,21 @@ public class UserController {
         String name = extractName(authentication, email);
         request.setRequesterEmail(email);
         request.setRequesterName(name);
-=======
-    public Booking createBooking(@AuthenticationPrincipal OAuth2User principal,
-                                 @Valid @RequestBody BookingRequest request) {
-        String email = principal.getAttribute("email");
-        String name = principal.getAttribute("name");
-        request.setRequesterEmail(email);
-        request.setRequesterName(name != null ? name : email);
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
         return campusService.createBooking(request);
     }
 
     @GetMapping("/bookings")
-<<<<<<< HEAD
     public List<Booking> getUserBookings(Authentication authentication) {
         String email = extractEmail(authentication);
         if (email == null) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "Authentication required");
         }
-=======
-    public List<Booking> getUserBookings(@AuthenticationPrincipal OAuth2User principal) {
-        String email = principal.getAttribute("email");
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
         return campusService.getUserBookings(email);
     }
 
     @PutMapping("/bookings/{id}/cancel")
     public Booking cancelUserBooking(@PathVariable String id,
-<<<<<<< HEAD
                                      Authentication authentication,
                                      @RequestParam(required = false) String reason) {
         String email = extractEmail(authentication);
@@ -124,11 +106,4 @@ public class UserController {
         }
         return fallbackEmail;
     }
-=======
-                                     @AuthenticationPrincipal OAuth2User principal,
-                                     @RequestParam(required = false) String reason) {
-        String email = principal.getAttribute("email");
-        return campusService.cancelUserBooking(id, email, reason);
-    }
->>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
 }
