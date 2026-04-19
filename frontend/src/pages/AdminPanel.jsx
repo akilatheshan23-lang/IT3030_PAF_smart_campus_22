@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
-import { 
-  LogOut, LayoutDashboard, CalendarCheck, AlertTriangle, 
-  Search, Calendar, ChevronDown
+import IncidentCommentsModal from '../components/IncidentCommentsModal'
+import {
+  LogOut,
+  LayoutDashboard,
+  CalendarCheck,
+  AlertTriangle,
+  Search,
+  Calendar,
+  ChevronDown,
+  ClipboardList
 } from 'lucide-react'
 
 const initialResourceForm = {
@@ -32,6 +39,15 @@ const parseAvailabilityWindow = (availabilityWindow) => {
 export default function AdminPanel() {
   const [summary, setSummary] = useState(null)
   const [bookings, setBookings] = useState([])
+  const [tickets, setTickets] = useState([])
+  const [technicians, setTechnicians] = useState([])
+  const [ticketAssignments, setTicketAssignments] = useState({})
+  const [ticketError, setTicketError] = useState('')
+  const [assigningTicketId, setAssigningTicketId] = useState('')
+  const [rejectingTicketId, setRejectingTicketId] = useState('')
+  const [closingTicketId, setClosingTicketId] = useState('')
+  const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [], index: 0 })
+  const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
   const [resources, setResources] = useState([])
   const [error, setError] = useState('')
   const [resourceListError, setResourceListError] = useState('')
@@ -58,11 +74,15 @@ export default function AdminPanel() {
     date: ''
   })
   const navigate = useNavigate()
+  const currentEmail = localStorage.getItem('smart-campus-user-email') || ''
+  const currentRole = localStorage.getItem('smart-campus-role') || 'ADMIN'
 
   useEffect(() => {
     loadSummary()
     loadBookings()
     loadResources()
+    loadTickets()
+    loadTechnicians()
   }, [])
 
   useEffect(() => {
@@ -124,6 +144,54 @@ export default function AdminPanel() {
     }
   }
 
+  const loadTickets = async () => {
+    try {
+      setTicketError('')
+      const response = await campusApi.get('/admin/tickets')
+      const data = response.data || []
+      setTickets(data)
+      const nextAssignments = {}
+      data.forEach(ticket => {
+        nextAssignments[ticket.id] = ticket.assignedTechnicianId || ''
+      })
+      setTicketAssignments(nextAssignments)
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to load tickets.')
+    }
+  }
+
+  const loadTechnicians = async () => {
+    try {
+      const response = await campusApi.get('/admin/technicians')
+      setTechnicians(response.data || [])
+    } catch (err) {
+      setTechnicians([])
+    }
+  }
+
+  const getResourceName = (resourceId) => {
+    const r = resources.find(res => res.id === resourceId)
+    return r ? r.name : resourceId
+  }
+
+  const openCommentModal = (ticket) => {
+    if (!ticket?.id) return
+    setCommentModal({
+      open: true,
+      ticketId: ticket.id,
+      ticketLabel: getResourceName(ticket.resourceId)
+    })
+  }
+
+  const formatTicketStatus = (status) => {
+    if (!status) return ''
+    return String(status)
+      .toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
+
   const handleFilterChange = (event) => {
     const nextFilters = {
       ...filters,
@@ -143,6 +211,67 @@ export default function AdminPanel() {
       [event.target.name]: event.target.value
     }
     setResourceFilters(nextFilters)
+  }
+
+  const handleTicketAssignmentChange = (ticketId, value) => {
+    setTicketAssignments(prev => ({
+      ...prev,
+      [ticketId]: value
+    }))
+  }
+
+  const handleAssignTicket = async (ticketId) => {
+    const technicianId = ticketAssignments[ticketId]
+    if (!technicianId) {
+      window.alert('Select a technician before assigning.')
+      return
+    }
+
+    setAssigningTicketId(ticketId)
+    setTicketError('')
+    try {
+      await campusApi.put(`/admin/tickets/${ticketId}/assign`, { technicianId })
+      await loadTickets()
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to assign ticket.')
+    } finally {
+      setAssigningTicketId('')
+    }
+  }
+
+  const handleRejectTicket = async (ticketId) => {
+    const reason = window.prompt('Enter a reason for rejecting this ticket:')
+    if (!reason || !reason.trim()) {
+      window.alert('Rejection reason is required.')
+      return
+    }
+
+    setRejectingTicketId(ticketId)
+    setTicketError('')
+    try {
+      await campusApi.put(`/admin/tickets/${ticketId}/reject`, { reason })
+      await loadTickets()
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to reject ticket.')
+    } finally {
+      setRejectingTicketId('')
+    }
+  }
+
+  const handleCloseTicket = async (ticketId) => {
+    const confirmed = window.confirm('Close this ticket?')
+    if (!confirmed) return
+
+    setClosingTicketId(ticketId)
+    setTicketError('')
+    try {
+      await campusApi.put(`/admin/tickets/${ticketId}/close`)
+      await loadTickets()
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to close ticket.')
+    } finally {
+      setClosingTicketId('')
+    }
   }
 
   const handleResourceFilterSubmit = (event) => {
@@ -442,6 +571,9 @@ export default function AdminPanel() {
            <a href="#bookings" className="nav-item">
              <CalendarCheck size={20} /> Booking Review
            </a>
+           <a href="#tickets" className="nav-item">
+             <ClipboardList size={20} /> Tickets
+           </a>
            <a href="#alerts" className="nav-item">
              <AlertTriangle size={20} /> Alerts
            </a>
@@ -471,6 +603,144 @@ export default function AdminPanel() {
           </button>
         </section>
 
+        <section id="tickets" className="admin-panel-box user-section glass-panel-soft" style={{padding: '32px'}}>
+          <div className="panel-top" style={{marginBottom: '20px'}}>
+            <div>
+              <span className="eyebrow" style={{color: '#0ea5e9'}}>Incident Tickets</span>
+              <h2 style={{color: '#0f172a', fontSize: '1.6rem', marginTop: '4px'}}>Assign tickets to technicians</h2>
+              <p>Review all tickets raised by users and route each issue to an available technician.</p>
+            </div>
+          </div>
+
+          {ticketError && (
+            <div className="error-banner" style={{display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px'}}>
+              <AlertTriangle size={18}/> {ticketError}
+            </div>
+          )}
+
+          <div className="table-wrap">
+            <table className="booking-table modern-table">
+              <thead>
+                <tr>
+                  <th className="table-header-custom">Ticket</th>
+                  <th className="table-header-custom">Category</th>
+                  <th className="table-header-custom">Priority</th>
+                  <th className="table-header-custom">Status</th>
+                  <th className="table-header-custom">Evidence</th>
+                  <th className="table-header-custom">Comments</th>
+                  <th className="table-header-custom">Created</th>
+                  <th className="table-header-custom">Assigned</th>
+                  <th className="table-header-custom">Assign</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.length === 0 ? (
+                  <tr>
+                    <td colSpan="9">
+                      <div className="custom-empty" style={{textAlign: 'center', margin: '32px 0'}}>
+                        <ClipboardList size={42} style={{color: '#cbd5e1', marginBottom: '12px'}}/>
+                        <div style={{color: '#64748b'}}>No tickets found.</div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  tickets.map(ticket => (
+                    <tr key={ticket.id} className="table-row-hover">
+                      <td className="small-text font-mono">{getResourceName(ticket.resourceId)}</td>
+                      <td>{ticket.category}</td>
+                      <td>{ticket.priority}</td>
+                      <td>
+                        <span className={`status-badge ${String(ticket.status).toLowerCase()}`}>
+                          {formatTicketStatus(ticket.status)}
+                        </span>
+                        {ticket.rejectionReason && (
+                          <span className="reason-tooltip premium-tooltip" title={ticket.rejectionReason}> ℹ️</span>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-secondary small-btn"
+                          disabled={!ticket.attachments || ticket.attachments.length === 0}
+                          onClick={() => setAttachmentModal({
+                            open: true,
+                            ticketId: ticket.id,
+                            attachments: ticket.attachments || [],
+                            index: 0
+                          })}
+                        >
+                          {ticket.attachments?.length || 0} files
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-secondary small-btn"
+                          onClick={() => openCommentModal(ticket)}
+                        >
+                          Comments
+                        </button>
+                      </td>
+                      <td>{ticket.createdAt}</td>
+                      <td>
+                        {ticket.assignedTechnicianName
+                          ? `${ticket.assignedTechnicianName} (${ticket.assignedTechnicianEmail})`
+                          : 'Unassigned'}
+                      </td>
+                      <td>
+                        <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                          <select
+                            value={ticketAssignments[ticket.id] || ''}
+                            onChange={(event) => handleTicketAssignmentChange(ticket.id, event.target.value)}
+                            disabled={['RESOLVED', 'CLOSED', 'REJECTED'].includes(ticket.status)}
+                          >
+                            <option value="">Select technician</option>
+                            {technicians.map(tech => (
+                              <option key={tech.id} value={tech.id}>
+                                {tech.name || tech.email}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="btn-primary small-btn"
+                            disabled={assigningTicketId === ticket.id || ['RESOLVED', 'CLOSED', 'REJECTED'].includes(ticket.status)}
+                            onClick={() => handleAssignTicket(ticket.id)}
+                          >
+                            {assigningTicketId === ticket.id ? 'Assigning...' : 'Assign'}
+                          </button>
+                        </div>
+                        <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
+                          {(ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') && (
+                            <button
+                              type="button"
+                              className="btn-danger small-btn ghost-danger"
+                              disabled={rejectingTicketId === ticket.id}
+                              onClick={() => handleRejectTicket(ticket.id)}
+                            >
+                              {rejectingTicketId === ticket.id ? 'Rejecting...' : 'Reject'}
+                            </button>
+                          )}
+                          {ticket.status === 'RESOLVED' && (
+                            <button
+                              type="button"
+                              className="btn-secondary small-btn"
+                              disabled={closingTicketId === ticket.id}
+                              onClick={() => handleCloseTicket(ticket.id)}
+                            >
+                              {closingTicketId === ticket.id ? 'Closing...' : 'Close'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         {resourceSubmitSuccess && <p className="success-text">{resourceSubmitSuccess}</p>}
 
         <section className="summary-grid">
@@ -495,6 +765,8 @@ export default function AdminPanel() {
             <p>Total Resources</p>
           </div>
         </section>
+
+        
 
 
         <section id="resources" className="admin-panel-box">
@@ -789,6 +1061,58 @@ export default function AdminPanel() {
           </div>
         </section>
       </main>
+
+      {attachmentModal.open && (
+        <div className="modal-overlay" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [], index: 0 })}>
+          <div className="modal-content popup-anim evidence-modal-full" onClick={(event) => event.stopPropagation()}>
+            <button className="close-btn" type="button" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [], index: 0 })}>
+              &times;
+            </button>
+            <h2 style={{marginTop: 0}}>Ticket Evidence</h2>
+            {attachmentModal.attachments.length === 0 ? (
+              <p className="text-muted">No attachments for this ticket.</p>
+            ) : (
+              <div className="evidence-viewer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={attachmentModal.index <= 0}
+                  onClick={() => setAttachmentModal(prev => ({ ...prev, index: Math.max(0, prev.index - 1) }))}
+                >
+                  Prev
+                </button>
+                <div className="evidence-frame">
+                  <img
+                    src={attachmentModal.attachments[attachmentModal.index]}
+                    alt={`Attachment ${attachmentModal.index + 1}`}
+                  />
+                  <div className="evidence-count">
+                    {attachmentModal.index + 1} / {attachmentModal.attachments.length}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={attachmentModal.index >= attachmentModal.attachments.length - 1}
+                  onClick={() => setAttachmentModal(prev => ({ ...prev, index: Math.min(prev.attachments.length - 1, prev.index + 1) }))}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {commentModal.open && (
+        <IncidentCommentsModal
+          ticketId={commentModal.ticketId}
+          ticketLabel={commentModal.ticketLabel}
+          currentEmail={currentEmail}
+          currentRole={currentRole}
+          onClose={() => setCommentModal({ open: false, ticketId: '', ticketLabel: '' })}
+        />
+      )}
 
       {isResourceModalOpen && (
         <div

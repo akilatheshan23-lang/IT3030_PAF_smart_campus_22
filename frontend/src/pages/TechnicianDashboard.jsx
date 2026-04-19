@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
+import IncidentCommentsModal from '../components/IncidentCommentsModal'
 
 export default function TechnicianDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
   const [authLoading, setAuthLoading] = useState(true)
+  // Module C State Management [cite: 38, 42]
+  const [assignedTickets, setAssignedTickets] = useState([])
+  const [ticketError, setTicketError] = useState('')
+  const [ticketLoading, setTicketLoading] = useState(true)
+  const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [], index: 0 })
+  const [resources, setResources] = useState([])
+  const [resolvingTicketId, setResolvingTicketId] = useState('')
+  const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
+  
   const navigate = useNavigate()
+  const notifications = [] // Placeholder for Module D [cite: 44]
 
-  const assignedTickets = []
-  const notifications = []
+  const currentEmail = profile.email
+  const currentRole = localStorage.getItem('smart-campus-role') || 'TECHNICIAN'
 
   useEffect(() => {
     const initialize = async () => {
@@ -30,6 +41,9 @@ export default function TechnicianDashboard() {
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
         setProfile({ email, name: name || email })
+        
+        // Load operational data for Technician 
+        await Promise.all([loadAssignedTickets(), loadResources()])
       } catch (err) {
         navigate('/login')
       } finally {
@@ -39,6 +53,43 @@ export default function TechnicianDashboard() {
 
     initialize()
   }, [])
+
+  const loadAssignedTickets = async () => {
+    try {
+      setTicketLoading(true)
+      setTicketError('')
+      const response = await campusApi.get('/technician/tickets')
+      setAssignedTickets(response.data || [])
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to load assigned tickets.')
+      setAssignedTickets([])
+    } finally {
+      setTicketLoading(false)
+    }
+  }
+
+  const loadResources = async () => {
+    try {
+      const response = await campusApi.get('/resources/public')
+      setResources(response.data || [])
+    } catch (err) {
+      setResources([])
+    }
+  }
+
+  const handleResolveTicket = async (ticketId) => {
+    setResolvingTicketId(ticketId)
+    setTicketError('')
+    try {
+      // Endpoint for Ticket Workflow: IN_PROGRESS -> RESOLVED [cite: 41, 42]
+      await campusApi.put(`/technician/tickets/${ticketId}/resolve`)
+      await loadAssignedTickets()
+    } catch (err) {
+      setTicketError(err?.response?.data?.message || 'Failed to resolve ticket.')
+    } finally {
+      setResolvingTicketId('')
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -58,9 +109,30 @@ export default function TechnicianDashboard() {
     resolved: assignedTickets.filter(ticket => ticket.status === 'RESOLVED').length
   }
 
-  if (authLoading) {
-    return null
+  const getTicketName = (ticket) => {
+    const resource = resources.find(r => r.id === ticket.resourceId)
+    return resource ? resource.name : (ticket.resourceId || ticket.id)
   }
+
+  const openCommentModal = (ticket) => {
+    if (!ticket?.id) return
+    setCommentModal({
+      open: true,
+      ticketId: ticket.id,
+      ticketLabel: getTicketName(ticket)
+    })
+  }
+
+  const formatTicketStatus = (status) => {
+    if (!status) return ''
+    return String(status)
+      .toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
+
+  if (authLoading) return null
 
   return (
     <div className="admin-layout technician-layout">
@@ -133,31 +205,74 @@ export default function TechnicianDashboard() {
               <thead>
                 <tr>
                   <th>Ticket</th>
-                  <th>Resource</th>
+                  <th>Category</th>
                   <th>Priority</th>
                   <th>Status</th>
-                  <th>Last Update</th>
+                  <th>Evidence</th>
+                  <th>Assigned</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {assignedTickets.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="empty-state">No tickets assigned yet.</td>
-                  </tr>
+                {ticketLoading ? (
+                  <tr><td colSpan="7" className="empty-state">Loading tickets...</td></tr>
+                ) : assignedTickets.length === 0 ? (
+                  <tr><td colSpan="7" className="empty-state">No tickets assigned yet.</td></tr>
                 ) : (
                   assignedTickets.map(ticket => (
                     <tr key={ticket.id}>
-                      <td>{ticket.code}</td>
-                      <td>{ticket.resource}</td>
+                      <td className="font-mono">{getTicketName(ticket)}</td>
+                      <td>{ticket.category}</td>
                       <td>{ticket.priority}</td>
-                      <td>{ticket.status}</td>
-                      <td>{ticket.updatedAt}</td>
+                      <td>
+                        <span className={`status-badge ${String(ticket.status).toLowerCase()}`}>
+                          {formatTicketStatus(ticket.status)}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-secondary small-btn"
+                          disabled={!ticket.attachments || ticket.attachments.length === 0}
+                          onClick={() => setAttachmentModal({
+                            open: true,
+                            ticketId: ticket.id,
+                            attachments: ticket.attachments || [],
+                            index: 0
+                          })}
+                        >
+                          {ticket.attachments?.length || 0} files [cite: 40]
+                        </button>
+                      </td>
+                      <td>{ticket.assignedAt || ticket.createdAt}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn-secondary small-btn"
+                            onClick={() => openCommentModal(ticket)}
+                          >
+                            Comments [cite: 43]
+                          </button>
+                          {ticket.status === 'IN_PROGRESS' && (
+                            <button
+                              type="button"
+                              className="btn-primary small-btn"
+                              disabled={resolvingTicketId === ticket.id}
+                              onClick={() => handleResolveTicket(ticket.id)}
+                            >
+                              {resolvingTicketId === ticket.id ? 'Resolving...' : 'Mark Resolved'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+          {ticketError && <div className="error-banner" style={{marginTop: '16px'}}>{ticketError}</div>}
         </section>
 
         <section id="notifications" className="admin-panel-box glass-panel-soft">
@@ -165,10 +280,9 @@ export default function TechnicianDashboard() {
             <div>
               <span className="eyebrow">Module D</span>
               <h2>Notifications</h2>
-              <p>Track updates on ticket status changes and new comments.</p>
+              <p>Track updates on ticket status changes and new comments[cite: 46].</p>
             </div>
           </div>
-
           {notifications.length === 0 ? (
             <div className="empty-state custom-empty glass-empty">
               <span className="empty-icon">🔔</span>
@@ -176,15 +290,39 @@ export default function TechnicianDashboard() {
             </div>
           ) : (
             <div className="alert-list">
-              {notifications.map((note, index) => (
-                <div key={index} className="alert-item">
-                  {note}
-                </div>
-              ))}
+              {notifications.map((note, index) => <div key={index} className="alert-item">{note}</div>)}
             </div>
           )}
         </section>
       </main>
+
+      {/* Modals for Evidence and Comments [cite: 40, 43] */}
+      {attachmentModal.open && (
+        <div className="modal-overlay" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [], index: 0 })}>
+          <div className="modal-content popup-anim evidence-modal-full" onClick={(e) => e.stopPropagation()}>
+            <button className="close-btn" type="button" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [], index: 0 })}>&times;</button>
+            <h2 style={{marginTop: 0}}>Ticket Evidence</h2>
+            <div className="evidence-viewer">
+              <button type="button" className="btn-secondary" disabled={attachmentModal.index <= 0} onClick={() => setAttachmentModal(prev => ({ ...prev, index: prev.index - 1 }))}>Prev</button>
+              <div className="evidence-frame">
+                <img src={attachmentModal.attachments[attachmentModal.index]} alt="Evidence" />
+                <div className="evidence-count">{attachmentModal.index + 1} / {attachmentModal.attachments.length}</div>
+              </div>
+              <button type="button" className="btn-secondary" disabled={attachmentModal.index >= attachmentModal.attachments.length - 1} onClick={() => setAttachmentModal(prev => ({ ...prev, index: prev.index + 1 }))}>Next</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {commentModal.open && (
+        <IncidentCommentsModal
+          ticketId={commentModal.ticketId}
+          ticketLabel={commentModal.ticketLabel}
+          currentEmail={currentEmail}
+          currentRole={currentRole}
+          onClose={() => setCommentModal({ open: false, ticketId: '', ticketLabel: '' })}
+        />
+      )}
     </div>
   )
 }
