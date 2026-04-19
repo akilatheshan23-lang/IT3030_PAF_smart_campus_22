@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 import IncidentCommentsModal from '../components/IncidentCommentsModal'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import {
   LogOut,
   LayoutDashboard,
@@ -35,6 +37,17 @@ const parseAvailabilityWindow = (availabilityWindow) => {
     endTime: isValidEnd ? endRaw : initialResourceForm.endTime
   }
 }
+
+const formatAMPM = (timeStr) => {
+  if (!timeStr) return '';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  let h = parseInt(parts[0], 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  const paddedH = h < 10 ? `0${h}` : h;
+  return `${paddedH}:${parts[1]} ${ampm}`;
+};
 
 export default function AdminPanel() {
   const [summary, setSummary] = useState(null)
@@ -550,6 +563,62 @@ export default function AdminPanel() {
     navigate('/')
   }
 
+  const downloadBookingsPDF = () => {
+    const doc = new jsPDF()
+
+    doc.setFontSize(20)
+    doc.setTextColor(30, 27, 75) // #1e1b4b
+    doc.text('Smart Campus', 14, 22)
+    
+    doc.setFontSize(14)
+    doc.setTextColor(109, 40, 217) // #6d28d9
+    doc.text('Booking Management Report', 14, 30)
+
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 38)
+
+    const tableColumn = ["Code", "Requester", "Resource", "Date", "Time", "Status"]
+    const tableRows = []
+
+    bookings.forEach(booking => {
+      const bookingData = [
+        booking.bookingCode || '-',
+        `${booking.requesterName}\n(${booking.requesterEmail})`,
+        booking.resourceName || '-',
+        booking.bookingDate || '-',
+        `${formatAMPM(booking.startTime)} - ${formatAMPM(booking.endTime)}`,
+        booking.status || '-'
+      ]
+      tableRows.push(bookingData)
+    })
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 45,
+      theme: 'grid',
+      headStyles: { fillColor: [109, 40, 217], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      styles: {
+        fontSize: 9,
+        cellPadding: 4,
+        lineColor: [226, 232, 240],
+        lineWidth: 0.1
+      },
+      columnStyles: {
+        0: { cellWidth: 22 },
+        1: { cellWidth: 50 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 32 },
+        5: { cellWidth: 22 },
+      }
+    })
+
+    doc.save('booking_management_report.pdf')
+  }
+
   return (
     <div className="admin-layout user-layout">
       <aside className="admin-sidebar user-sidebar">
@@ -949,7 +1018,17 @@ export default function AdminPanel() {
               />
             </div>
 
-            <button type="submit" className="btn-primary apply-btn" style={{background: '#3b82f6'}}>Apply Filters</button>
+            <div style={{display: 'flex', gap: '12px'}}>
+              <button type="submit" className="btn-primary apply-btn" style={{background: '#3b82f6', whiteSpace: 'nowrap'}}>Apply Filters</button>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={downloadBookingsPDF}
+                style={{display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap'}}
+              >
+                <ClipboardList size={18} /> Download PDF
+              </button>
+            </div>
           </form>
 
           {error && (
@@ -993,7 +1072,7 @@ export default function AdminPanel() {
                       </td>
                       <td style={{color: '#334155', fontWeight: '500'}}>{booking.resourceName}</td>
                       <td style={{color: '#475569'}}>{booking.bookingDate}</td>
-                      <td style={{color: '#475569'}}>{booking.startTime} - {booking.endTime}</td>
+                      <td style={{color: '#475569'}}>{formatAMPM(booking.startTime)} - {formatAMPM(booking.endTime)}</td>
                       <td style={{color: '#475569'}}>{booking.purpose}</td>
                       <td>
                         <span className={`status-badge ${String(booking.status).toLowerCase()}`}>
