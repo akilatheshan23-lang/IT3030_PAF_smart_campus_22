@@ -943,6 +943,109 @@ a {
   font-weight: 600;
 }
 
+.util-heatmap-section {
+  margin-top: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.util-heatmap-title {
+  margin: 0 0 12px;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.util-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.util-heat-card {
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+}
+
+.util-heat-card-department {
+  min-height: 2.4rem;
+  color: #334155;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.util-heat-card-percent {
+  margin: 8px 0;
+  text-align: center;
+  color: #0f172a;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.util-heat-card-meta {
+  text-align: center;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.util-heat-card-low {
+  background: #dcfce7;
+}
+
+.util-heat-card-moderate {
+  background: #fef9c3;
+}
+
+.util-heat-card-high {
+  background: #fed7aa;
+}
+
+.util-heat-card-critical {
+  background: #fecaca;
+}
+
+.util-heatmap-legend-wrap {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.util-heatmap-legend-title {
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.util-heatmap-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+}
+
+.util-heatmap-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.util-heatmap-legend-dot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+}
+
 .admin-panel-box {
   margin-bottom: 24px;
   padding: 24px;
@@ -1053,6 +1156,16 @@ a {
   border-radius: 12px;
   padding: 10px 14px;
   font-weight: 700;
+}
+
+@media (min-width: 900px) {
+  .util-heatmap-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .util-heatmap-legend-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1100px) {

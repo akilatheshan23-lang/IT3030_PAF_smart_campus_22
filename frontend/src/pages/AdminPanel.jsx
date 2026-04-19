@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 import IncidentCommentsModal from '../components/IncidentCommentsModal'
+import UtilizationHeatmap from '../components/UtilizationHeatmap'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import {
@@ -20,12 +21,19 @@ const initialResourceForm = {
   type: 'Lecture Hall',
   capacity: '',
   location: '',
+  department: 'Faculty of Computing',
   startTime: '08:00',
   endTime: '18:00',
   status: 'ACTIVE'
 }
 
 const resourceTypes = ['Lecture Hall', 'Projector', 'Lab', 'Meeting Room', 'Equipment', 'Other']
+const resourceDepartments = [
+  'Faculty of Computing',
+  'Engineering Department',
+  'Faculty of Business',
+  'Architecture Department'
+]
 
 const parseAvailabilityWindow = (availabilityWindow) => {
   const [startRaw = '', endRaw = ''] = String(availabilityWindow || '').split('-').map((part) => part.trim())
@@ -61,6 +69,7 @@ export default function AdminPanel() {
   const [closingTicketId, setClosingTicketId] = useState('')
   const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [], index: 0 })
   const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
+  const [utilizationHeatmap, setUtilizationHeatmap] = useState([])
   const [resources, setResources] = useState([])
   const [error, setError] = useState('')
   const [resourceListError, setResourceListError] = useState('')
@@ -94,11 +103,13 @@ export default function AdminPanel() {
     loadSummary()
     loadBookings()
     loadResources()
+    loadUtilizationHeatmap()
     loadTickets()
     loadTechnicians()
 
     const summaryRefreshInterval = window.setInterval(() => {
       loadSummary()
+      loadUtilizationHeatmap()
     }, 15000)
 
     return () => window.clearInterval(summaryRefreshInterval)
@@ -140,6 +151,15 @@ export default function AdminPanel() {
       setBookings(response.data)
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to load bookings.')
+    }
+  }
+
+  const loadUtilizationHeatmap = async () => {
+    try {
+      const response = await campusApi.get('/admin/dashboard/utilization-heatmap')
+      setUtilizationHeatmap(Array.isArray(response.data) ? response.data : [])
+    } catch (err) {
+      setUtilizationHeatmap([])
     }
   }
 
@@ -329,6 +349,7 @@ export default function AdminPanel() {
       type: resource.type || initialResourceForm.type,
       capacity: String(resource.capacity ?? ''),
       location: resource.location || '',
+      department: resource.department || initialResourceForm.department,
       startTime,
       endTime,
       status: resource.status || initialResourceForm.status
@@ -379,6 +400,7 @@ export default function AdminPanel() {
     const normalizedName = resourceForm.name.trim()
     const normalizedType = resourceForm.type.trim()
     const normalizedLocation = resourceForm.location.trim()
+    const normalizedDepartment = resourceForm.department.trim()
     const capacityValue = Number(resourceForm.capacity)
 
     if (!normalizedName) {
@@ -397,6 +419,12 @@ export default function AdminPanel() {
       nextErrors.location = 'Location is required.'
     } else if (normalizedLocation.length > 120) {
       nextErrors.location = 'Location must be at most 120 characters.'
+    }
+
+    if (!normalizedDepartment) {
+      nextErrors.department = 'Department is required.'
+    } else if (!resourceDepartments.includes(normalizedDepartment)) {
+      nextErrors.department = 'Select a valid department.'
     }
 
     if (!resourceForm.capacity) {
@@ -446,6 +474,7 @@ export default function AdminPanel() {
       type: resourceForm.type.trim(),
       capacity: Number(resourceForm.capacity),
       location: resourceForm.location.trim(),
+      department: resourceForm.department.trim(),
       availabilityWindow: `${resourceForm.startTime} - ${resourceForm.endTime}`,
       status: resourceForm.status
     }
@@ -551,6 +580,7 @@ export default function AdminPanel() {
         reason
       })
       await loadSummary()
+      await loadUtilizationHeatmap()
       await loadBookings(filters)
     } catch (err) {
       window.alert(err?.response?.data?.message || 'Status update failed.')
@@ -1065,6 +1095,8 @@ export default function AdminPanel() {
               <p className="empty-state">No bookings available to render peak booking hours.</p>
             )}
           </div>
+
+          <UtilizationHeatmap data={utilizationHeatmap} />
         </section>
 
         
@@ -1123,11 +1155,11 @@ export default function AdminPanel() {
             <table className="booking-table asset-table">
               <thead>
                 <tr>
-                  <th>Asset ID</th>
                   <th>Name</th>
                   <th>Type</th>
                   <th>Capacity</th>
                   <th>Location</th>
+                  <th>Department</th>
                   <th>Availability</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -1145,11 +1177,11 @@ export default function AdminPanel() {
                 ) : (
                   resources.map((resource) => (
                     <tr key={resource.id} className="table-row-hover">
-                      <td className="small-text font-mono">{resource.id}</td>
                       <td>{resource.name || '-'}</td>
                       <td>{resource.type || '-'}</td>
                       <td>{resource.capacity ?? '-'}</td>
                       <td>{resource.location || '-'}</td>
+                      <td>{resource.department || '-'}</td>
                       <td>{resource.availabilityWindow || '-'}</td>
                       <td>
                         <span className={`status ${String(resource.status).toLowerCase()}`}>
@@ -1519,19 +1551,37 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label htmlFor="resourceLocation">Location</label>
-                <input
-                  id="resourceLocation"
-                  type="text"
-                  name="location"
-                  placeholder="Block A"
-                  value={resourceForm.location}
-                  onChange={handleResourceInputChange}
-                  className={resourceErrors.location ? 'input-error' : ''}
-                  maxLength={120}
-                />
-                {resourceErrors.location && <span className="field-error">{resourceErrors.location}</span>}
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="resourceLocation">Location</label>
+                  <input
+                    id="resourceLocation"
+                    type="text"
+                    name="location"
+                    placeholder="Block A"
+                    value={resourceForm.location}
+                    onChange={handleResourceInputChange}
+                    className={resourceErrors.location ? 'input-error' : ''}
+                    maxLength={120}
+                  />
+                  {resourceErrors.location && <span className="field-error">{resourceErrors.location}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="resourceDepartment">Department</label>
+                  <select
+                    id="resourceDepartment"
+                    name="department"
+                    value={resourceForm.department}
+                    onChange={handleResourceInputChange}
+                    className={resourceErrors.department ? 'input-error' : ''}
+                  >
+                    {resourceDepartments.map((departmentOption) => (
+                      <option key={departmentOption} value={departmentOption}>{departmentOption}</option>
+                    ))}
+                  </select>
+                  {resourceErrors.department && <span className="field-error">{resourceErrors.department}</span>}
+                </div>
               </div>
 
               <div className="form-row">
