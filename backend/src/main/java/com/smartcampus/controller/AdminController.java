@@ -44,6 +44,11 @@ public class AdminController {
         return campusService.getAdminSummary();
     }
 
+    @GetMapping("/dashboard/utilization-heatmap")
+    public List<Map<String, Object>> getUtilizationHeatmap() {
+        return campusService.getDepartmentUtilizationHeatmap();
+    }
+
     @GetMapping("/bookings")
     public List<Booking> getBookings(
             @RequestParam(required = false) BookingStatus status,

@@ -1,15 +1,16 @@
 package com.smartcampus.seed;
 
+import java.util.List;
+
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
 import com.smartcampus.model.Booking;
 import com.smartcampus.model.BookingStatus;
 import com.smartcampus.model.Resource;
 import com.smartcampus.model.ResourceStatus;
 import com.smartcampus.repository.BookingRepository;
 import com.smartcampus.repository.ResourceRepository;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
@@ -26,16 +27,40 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) {
         if (resourceRepository.count() == 0) {
             Resource hall = resourceRepository.save(new Resource(
-                    "Main Lecture Hall A", "Lecture Hall", 180, "Block A", "08:00 - 18:00", ResourceStatus.ACTIVE
+                    "Main Lecture Hall A",
+                    "Lecture Hall",
+                    180,
+                    "Block A",
+                    "Faculty of Computing",
+                    "08:00 - 18:00",
+                    ResourceStatus.ACTIVE
             ));
             Resource lab = resourceRepository.save(new Resource(
-                    "Computing Lab 03", "Lab", 60, "Block C", "09:00 - 17:00", ResourceStatus.ACTIVE
+                    "Computing Lab 03",
+                    "Lab",
+                    60,
+                    "Block C",
+                    "Faculty of Computing",
+                    "09:00 - 17:00",
+                    ResourceStatus.ACTIVE
             ));
             Resource room = resourceRepository.save(new Resource(
-                    "Innovation Meeting Room", "Meeting Room", 20, "Admin Building", "08:30 - 16:30", ResourceStatus.ACTIVE
+                    "Innovation Meeting Room",
+                    "Meeting Room",
+                    20,
+                    "Admin Building",
+                    "Engineering Department",
+                    "08:30 - 16:30",
+                    ResourceStatus.ACTIVE
             ));
             resourceRepository.save(new Resource(
-                    "Projector Unit P-12", "Equipment", 1, "Media Store", "08:00 - 15:00", ResourceStatus.OUT_OF_SERVICE
+                    "Projector Unit P-12",
+                    "Equipment",
+                    1,
+                    "Media Store",
+                    "Architecture Department",
+                    "08:00 - 15:00",
+                    ResourceStatus.OUT_OF_SERVICE
             ));
 
             if (bookingRepository.count() == 0) {

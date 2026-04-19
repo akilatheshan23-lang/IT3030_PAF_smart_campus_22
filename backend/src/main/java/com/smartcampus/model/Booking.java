@@ -17,6 +17,7 @@ public class Booking {
     private String requesterEmail;
     private String resourceId;
     private String resourceName;
+    private String resourceDepartment;
     private String bookingDate;
     private String startTime;
     private String endTime;
@@ -91,6 +92,14 @@ public class Booking {
 
     public void setResourceName(String resourceName) {
         this.resourceName = resourceName;
+    }
+
+    public String getResourceDepartment() {
+        return resourceDepartment;
+    }
+
+    public void setResourceDepartment(String resourceDepartment) {
+        this.resourceDepartment = resourceDepartment;
     }
 
     public String getBookingDate() {
