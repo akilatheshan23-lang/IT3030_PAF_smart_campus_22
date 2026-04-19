@@ -6,6 +6,7 @@ import IncidentCommentsModal from '../components/IncidentCommentsModal'
 export default function TechnicianDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
   const [authLoading, setAuthLoading] = useState(true)
+  // Module C State Management [cite: 38, 42]
   const [assignedTickets, setAssignedTickets] = useState([])
   const [ticketError, setTicketError] = useState('')
   const [ticketLoading, setTicketLoading] = useState(true)
@@ -13,12 +14,12 @@ export default function TechnicianDashboard() {
   const [resources, setResources] = useState([])
   const [resolvingTicketId, setResolvingTicketId] = useState('')
   const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
+  
   const navigate = useNavigate()
+  const notifications = [] // Placeholder for Module D [cite: 44]
 
   const currentEmail = profile.email
   const currentRole = localStorage.getItem('smart-campus-role') || 'TECHNICIAN'
-
-  const notifications = []
 
   useEffect(() => {
     const initialize = async () => {
@@ -40,6 +41,8 @@ export default function TechnicianDashboard() {
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
         setProfile({ email, name: name || email })
+        
+        // Load operational data for Technician 
         await Promise.all([loadAssignedTickets(), loadResources()])
       } catch (err) {
         navigate('/login')
@@ -78,6 +81,7 @@ export default function TechnicianDashboard() {
     setResolvingTicketId(ticketId)
     setTicketError('')
     try {
+      // Endpoint for Ticket Workflow: IN_PROGRESS -> RESOLVED [cite: 41, 42]
       await campusApi.put(`/technician/tickets/${ticketId}/resolve`)
       await loadAssignedTickets()
     } catch (err) {
@@ -128,9 +132,7 @@ export default function TechnicianDashboard() {
       .join(' ')
   }
 
-  if (authLoading) {
-    return null
-  }
+  if (authLoading) return null
 
   return (
     <div className="admin-layout technician-layout">
@@ -191,8 +193,8 @@ export default function TechnicianDashboard() {
 
         <section id="tickets" className="admin-panel-box glass-panel-soft">
           <div className="panel-top">
-              <div>
-              <span className="eyebrow"></span>
+            <div>
+              <span className="eyebrow">Module C</span>
               <h2>Maintenance & Incident Tickets</h2>
               <p>Monitor tickets assigned to you and update their status with resolution notes.</p>
             </div>
@@ -213,13 +215,9 @@ export default function TechnicianDashboard() {
               </thead>
               <tbody>
                 {ticketLoading ? (
-                  <tr>
-                    <td colSpan="8" className="empty-state">Loading tickets...</td>
-                  </tr>
+                  <tr><td colSpan="7" className="empty-state">Loading tickets...</td></tr>
                 ) : assignedTickets.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" className="empty-state">No tickets assigned yet.</td>
-                  </tr>
+                  <tr><td colSpan="7" className="empty-state">No tickets assigned yet.</td></tr>
                 ) : (
                   assignedTickets.map(ticket => (
                     <tr key={ticket.id}>
@@ -230,9 +228,6 @@ export default function TechnicianDashboard() {
                         <span className={`status-badge ${String(ticket.status).toLowerCase()}`}>
                           {formatTicketStatus(ticket.status)}
                         </span>
-                        {ticket.rejectionReason && (
-                          <span className="reason-tooltip premium-tooltip" title={ticket.rejectionReason}> ℹ️</span>
-                        )}
                       </td>
                       <td>
                         <button
@@ -246,7 +241,7 @@ export default function TechnicianDashboard() {
                             index: 0
                           })}
                         >
-                          {ticket.attachments?.length || 0} files
+                          {ticket.attachments?.length || 0} files [cite: 40]
                         </button>
                       </td>
                       <td>{ticket.assignedAt || ticket.createdAt}</td>
@@ -257,7 +252,7 @@ export default function TechnicianDashboard() {
                             className="btn-secondary small-btn"
                             onClick={() => openCommentModal(ticket)}
                           >
-                            Comments
+                            Comments [cite: 43]
                           </button>
                           {ticket.status === 'IN_PROGRESS' && (
                             <button
@@ -277,23 +272,17 @@ export default function TechnicianDashboard() {
               </tbody>
             </table>
           </div>
-
-          {ticketError && (
-            <div className="error-banner" style={{marginTop: '16px'}}>
-              {ticketError}
-            </div>
-          )}
+          {ticketError && <div className="error-banner" style={{marginTop: '16px'}}>{ticketError}</div>}
         </section>
 
         <section id="notifications" className="admin-panel-box glass-panel-soft">
           <div className="panel-top">
             <div>
-              <span className="eyebrow"></span>
+              <span className="eyebrow">Module D</span>
               <h2>Notifications</h2>
-              <p>Track updates on ticket status changes and new comments.</p>
+              <p>Track updates on ticket status changes and new comments[cite: 46].</p>
             </div>
           </div>
-
           {notifications.length === 0 ? (
             <div className="empty-state custom-empty glass-empty">
               <span className="empty-icon">🔔</span>
@@ -301,54 +290,26 @@ export default function TechnicianDashboard() {
             </div>
           ) : (
             <div className="alert-list">
-              {notifications.map((note, index) => (
-                <div key={index} className="alert-item">
-                  {note}
-                </div>
-              ))}
+              {notifications.map((note, index) => <div key={index} className="alert-item">{note}</div>)}
             </div>
           )}
         </section>
       </main>
 
+      {/* Modals for Evidence and Comments [cite: 40, 43] */}
       {attachmentModal.open && (
         <div className="modal-overlay" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [], index: 0 })}>
-          <div className="modal-content popup-anim evidence-modal-full" onClick={(event) => event.stopPropagation()}>
-            <button className="close-btn" type="button" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [], index: 0 })}>
-              &times;
-            </button>
+          <div className="modal-content popup-anim evidence-modal-full" onClick={(e) => e.stopPropagation()}>
+            <button className="close-btn" type="button" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [], index: 0 })}>&times;</button>
             <h2 style={{marginTop: 0}}>Ticket Evidence</h2>
-            {attachmentModal.attachments.length === 0 ? (
-              <p className="text-muted">No attachments for this ticket.</p>
-            ) : (
-              <div className="evidence-viewer">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={attachmentModal.index <= 0}
-                  onClick={() => setAttachmentModal(prev => ({ ...prev, index: Math.max(0, prev.index - 1) }))}
-                >
-                  Prev
-                </button>
-                <div className="evidence-frame">
-                  <img
-                    src={attachmentModal.attachments[attachmentModal.index]}
-                    alt={`Attachment ${attachmentModal.index + 1}`}
-                  />
-                  <div className="evidence-count">
-                    {attachmentModal.index + 1} / {attachmentModal.attachments.length}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={attachmentModal.index >= attachmentModal.attachments.length - 1}
-                  onClick={() => setAttachmentModal(prev => ({ ...prev, index: Math.min(prev.attachments.length - 1, prev.index + 1) }))}
-                >
-                  Next
-                </button>
+            <div className="evidence-viewer">
+              <button type="button" className="btn-secondary" disabled={attachmentModal.index <= 0} onClick={() => setAttachmentModal(prev => ({ ...prev, index: prev.index - 1 }))}>Prev</button>
+              <div className="evidence-frame">
+                <img src={attachmentModal.attachments[attachmentModal.index]} alt="Evidence" />
+                <div className="evidence-count">{attachmentModal.index + 1} / {attachmentModal.attachments.length}</div>
               </div>
-            )}
+              <button type="button" className="btn-secondary" disabled={attachmentModal.index >= attachmentModal.attachments.length - 1} onClick={() => setAttachmentModal(prev => ({ ...prev, index: prev.index + 1 }))}>Next</button>
+            </div>
           </div>
         </div>
       )}

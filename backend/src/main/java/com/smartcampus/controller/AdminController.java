@@ -1,6 +1,7 @@
 package com.smartcampus.controller;
 
 import com.smartcampus.dto.BookingStatusUpdateRequest;
+<<<<<<< HEAD
 import com.smartcampus.dto.TicketAssignmentRequest;
 import com.smartcampus.dto.TicketRejectionRequest;
 import com.smartcampus.model.Booking;
@@ -10,6 +11,11 @@ import com.smartcampus.model.TechnicianAccount;
 import com.smartcampus.repository.TechnicianAccountRepository;
 import com.smartcampus.service.CampusService;
 import com.smartcampus.service.IncidentService;
+=======
+import com.smartcampus.model.Booking;
+import com.smartcampus.model.BookingStatus;
+import com.smartcampus.service.CampusService;
+>>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +33,7 @@ import java.util.Map;
 public class AdminController {
 
     private final CampusService campusService;
+<<<<<<< HEAD
     private final IncidentService incidentService;
     private final TechnicianAccountRepository technicianAccountRepository;
 
@@ -36,6 +43,11 @@ public class AdminController {
         this.campusService = campusService;
         this.incidentService = incidentService;
         this.technicianAccountRepository = technicianAccountRepository;
+=======
+
+    public AdminController(CampusService campusService) {
+        this.campusService = campusService;
+>>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
     }
 
     @GetMapping("/dashboard/summary")
@@ -56,6 +68,7 @@ public class AdminController {
     public Booking updateStatus(@PathVariable String id, @Valid @RequestBody BookingStatusUpdateRequest request) {
         return campusService.updateBookingStatus(id, request);
     }
+<<<<<<< HEAD
 
     @GetMapping("/tickets")
     public List<Incident> getTickets() {
@@ -86,4 +99,6 @@ public class AdminController {
     public Incident closeTicket(@PathVariable String id) {
         return incidentService.closeTicket(id);
     }
+=======
+>>>>>>> ae31933d4c5b938a7be19bce3b8c52635ecb13d4
 }

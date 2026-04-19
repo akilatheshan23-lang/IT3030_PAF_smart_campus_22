@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 import BookingModal from '../components/BookingModal'
+// Module C Components
 import ReportIncident from '../components/ReportIncident'
 import EditIncidentModal from '../components/EditIncidentModal'
 import IncidentCommentsModal from '../components/IncidentCommentsModal'
@@ -11,6 +12,7 @@ export default function UserDashboard() {
   const [authLoading, setAuthLoading] = useState(true)
   const [bookings, setBookings] = useState([])
   const [resources, setResources] = useState([])
+  // Module C State Management
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -18,6 +20,7 @@ export default function UserDashboard() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelBookingId, setCancelBookingId] = useState(null)
   const [cancelReason, setCancelReason] = useState('')
+  // Incident Reporting State
   const [reportModalOpen, setReportModalOpen] = useState(false)
   const [reportResourceId, setReportResourceId] = useState('')
   const [ticketSuccess, setTicketSuccess] = useState('')
@@ -25,11 +28,12 @@ export default function UserDashboard() {
   const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [] })
   const [deletingTicketId, setDeletingTicketId] = useState('')
   const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
+  
   const navigate = useNavigate()
   const userEmail = profile.email
   const userName = profile.name
   const currentRole = localStorage.getItem('smart-campus-role') || 'USER'
-  const notifications = []
+  const notifications = [] // Placeholder for Module D
 
   useEffect(() => {
     const initialize = async () => {
@@ -51,6 +55,8 @@ export default function UserDashboard() {
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
         setProfile({ email, name: name || email })
+        
+        // Load all required modules for User
         await Promise.all([loadBookings(), loadResources(), loadTickets()])
       } catch (err) {
         navigate('/login')
@@ -151,9 +157,7 @@ export default function UserDashboard() {
 
     try {
       await campusApi.put(`/user/bookings/${cancelBookingId}/cancel`, null, {
-        params: {
-          reason: cancelReason
-        }
+        params: { reason: cancelReason }
       })
       loadBookings()
       setCancelModalOpen(false)
@@ -180,9 +184,7 @@ export default function UserDashboard() {
   )
   const historyBookings = bookings
 
-  if (authLoading) {
-    return null
-  }
+  if (authLoading) return null
 
   return (
     <div className="admin-layout user-layout">
@@ -230,10 +232,12 @@ export default function UserDashboard() {
           </div>
         </section>
 
+        {ticketSuccess && <div className="success-banner">{ticketSuccess}</div>}
+
         <section id="catalogue" className="user-section admin-panel-box glass-panel-soft">
           <div className="panel-top">
-              <div>
-              <span className="eyebrow"></span>
+            <div>
+              <span className="eyebrow">Module A</span>
               <h2>Facilities & Assets Catalogue</h2>
               <p>Preview bookable spaces and equipment with key metadata.</p>
             </div>
@@ -250,9 +254,7 @@ export default function UserDashboard() {
                 <div key={resource.id} className="resource-card">
                   <div className="resource-top">
                     <span className="badge">{resource.type}</span>
-                    <span className={`status ${String(resource.status).toLowerCase()}`}>
-                      {resource.status}
-                    </span>
+                    <span className={`status ${String(resource.status).toLowerCase()}`}>{resource.status}</span>
                   </div>
                   <h3>{resource.name}</h3>
                   <p>{resource.location}</p>
@@ -260,6 +262,7 @@ export default function UserDashboard() {
                     <span>Capacity: {resource.capacity}</span>
                     <span>{resource.availabilityWindow}</span>
                   </div>
+                  <button className="btn-secondary small-btn full-width mt-3" onClick={() => openReportModal(resource.id)}>Report Issue</button>
                 </div>
               ))}
             </div>
@@ -276,7 +279,6 @@ export default function UserDashboard() {
             <div className="empty-state custom-empty glass-empty">
               <span className="empty-icon">📭</span>
               <p>You have no upcoming approved bookings.</p>
-              <button className="btn-secondary" style={{ marginTop: '16px' }} onClick={() => setIsModalOpen(true)}>Book Something</button>
             </div>
           ) : (
             <div className="resource-grid premium-grid">
@@ -287,12 +289,10 @@ export default function UserDashboard() {
                     <span className="status approved dot-status">APPROVED</span>
                   </div>
                   <h3 className="booking-date">{b.bookingDate}</h3>
-                  <div className="booking-time-wrap">
-                    <p>⏱ {b.startTime} - {b.endTime}</p>
-                  </div>
+                  <p>⏱ {b.startTime} - {b.endTime}</p>
                   <p className="purpose-text">"{b.purpose}"</p>
-                  <button className="btn-danger full-width hover-lift" onClick={() => triggerCancel(b.id)}>Cancel Booking</button>
-                  <button className="btn-secondary full-width hover-lift mt-2" onClick={() => openReportModal(b.resourceId)}>Report Issue</button>
+                  <button className="btn-danger full-width hover-lift mb-2" onClick={() => triggerCancel(b.id)}>Cancel Booking</button>
+                  <button className="btn-secondary full-width hover-lift" onClick={() => openReportModal(b.resourceId)}>Report Issue</button>
                 </div>
               ))}
             </div>
@@ -304,12 +304,9 @@ export default function UserDashboard() {
             <div>
               <span className="eyebrow">Your Activity</span>
               <h2>Booking History</h2>
-              <p>Track the status of all your past and pending requests.</p>
+              <p>Track the status of all your requests.</p>
             </div>
           </div>
-
-          {error && <p className="error-text error-banner">{error}</p>}
-
           <div className="table-wrap premium-table-wrap">
             <table className="booking-table user-table">
               <thead>
@@ -323,43 +320,21 @@ export default function UserDashboard() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan="5" className="empty-state">
-                      <div className="loader"></div> Loading...
-                    </td>
-                  </tr>
+                  <tr><td colSpan="5" className="empty-state">Loading...</td></tr>
                 ) : historyBookings.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="empty-state">No booking history yet.</td>
-                  </tr>
+                  <tr><td colSpan="5" className="empty-state">No history yet.</td></tr>
                 ) : (
                   historyBookings.map(b => (
                     <tr key={b.id} className="table-row-hover">
                       <td className="font-mono">{b.bookingCode}</td>
                       <td className="font-semibold">{b.resourceName}</td>
-                      <td>
-                        <div className="date-time-cell">
-                          <span className="t-date">{b.bookingDate}</span>
-                          <span className="t-time text-muted" style={{ display: 'block', fontSize: '0.85rem' }}>{b.startTime} - {b.endTime}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`status ${String(b.status).toLowerCase()} pill-status`}>
-                          {b.status}
-                        </span>
-                        {b.decisionReason && (
-                          <span className="reason-tooltip premium-tooltip" title={b.decisionReason}> ℹ️</span>
-                        )}
-                      </td>
+                      <td>{b.bookingDate} ({b.startTime})</td>
+                      <td><span className={`status ${String(b.status).toLowerCase()} pill-status`}>{b.status}</span></td>
                       <td>
                         {(b.status === 'PENDING' || b.status === 'APPROVED') && (
-                          <button className="btn-danger small-btn ghost-danger" onClick={() => triggerCancel(b.id)}>
-                            Cancel
-                          </button>
+                          <button className="btn-danger small-btn ghost-danger" onClick={() => triggerCancel(b.id)}>Cancel</button>
                         )}
-                        <button className="btn-secondary small-btn ghost" onClick={() => openReportModal(b.resourceId)} style={{ marginLeft: '8px' }}>
-                          Report Issue
-                        </button>
+                        <button className="btn-secondary small-btn ghost ml-2" onClick={() => openReportModal(b.resourceId)}>Report</button>
                       </td>
                     </tr>
                   ))
@@ -371,8 +346,8 @@ export default function UserDashboard() {
 
         <section id="tickets" className="user-section admin-panel-box glass-panel-soft">
           <div className="panel-top">
-              <div>
-              <span className="eyebrow"></span>
+            <div>
+              <span className="eyebrow">Module C</span>
               <h2>Maintenance & Incident Tickets</h2>
               <p>Track incident reports for your requested resources.</p>
             </div>
@@ -393,7 +368,6 @@ export default function UserDashboard() {
                     <th>Priority</th>
                     <th>Status</th>
                     <th>Evidence</th>
-                    <th>Created</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -403,56 +377,18 @@ export default function UserDashboard() {
                       <td className="font-mono">{getResourceName(t.resourceId)}</td>
                       <td>{t.category}</td>
                       <td>{t.priority}</td>
+                      <td><span className={`status-badge ${String(t.status).toLowerCase()}`}>{formatTicketStatus(t.status)}</span></td>
                       <td>
-                        <span className={`status-badge ${String(t.status).toLowerCase()}`}>
-                          {formatTicketStatus(t.status)}
-                        </span>
-                        {t.rejectionReason && (
-                          <span className="reason-tooltip premium-tooltip" title={t.rejectionReason}> ℹ️</span>
-                        )}
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-secondary small-btn"
-                          disabled={!t.attachments || t.attachments.length === 0}
-                          onClick={() => setAttachmentModal({
-                            open: true,
-                            ticketId: t.id,
-                            attachments: t.attachments || []
-                          })}
-                        >
+                        <button className="btn-secondary small-btn" disabled={!t.attachments?.length} onClick={() => setAttachmentModal({ open: true, ticketId: t.id, attachments: t.attachments || [] })}>
                           {t.attachments?.length || 0} files
                         </button>
                       </td>
-                      <td>{t.createdAt}</td>
                       <td>
-                        <div style={{display: 'flex', gap: '8px'}}>
-                          <button
-                            type="button"
-                            className="btn-secondary small-btn ghost"
-                            onClick={() => openCommentModal(t)}
-                          >
-                            Comments
-                          </button>
-                          {t.status !== 'RESOLVED' && t.status !== 'CLOSED' && (
-                            <button
-                              type="button"
-                              className="btn-secondary small-btn"
-                              onClick={() => setEditTicket(t)}
-                            >
-                              Edit
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="btn-danger small-btn ghost-danger"
-                            disabled={deletingTicketId === t.id}
-                            onClick={() => handleDeleteTicket(t.id)}
-                          >
-                            {deletingTicketId === t.id ? 'Deleting...' : 'Delete'}
-                          </button>
-                        </div>
+                        <button className="btn-secondary small-btn ghost" onClick={() => openCommentModal(t)}>Comments</button>
+                        {t.status !== 'RESOLVED' && t.status !== 'CLOSED' && (
+                          <button className="btn-secondary small-btn ml-2" onClick={() => setEditTicket(t)}>Edit</button>
+                        )}
+                        <button className="btn-danger small-btn ghost-danger ml-2" disabled={deletingTicketId === t.id} onClick={() => handleDeleteTicket(t.id)}>Delete</button>
                       </td>
                     </tr>
                   ))}
@@ -465,89 +401,45 @@ export default function UserDashboard() {
         <section id="notifications" className="user-section admin-panel-box glass-panel-soft">
           <div className="panel-top">
             <div>
-              <span className="eyebrow"></span>
+              <span className="eyebrow">Module D</span>
               <h2>Notifications</h2>
-              <p>Stay updated on booking approvals and ticket status changes.</p>
+              <p>Stay updated on booking and ticket changes.</p>
             </div>
           </div>
-
-          {notifications.length === 0 ? (
-            <div className="empty-state custom-empty glass-empty">
-              <span className="empty-icon">🔔</span>
-              <p>No notifications yet.</p>
-            </div>
-          ) : (
-            <div className="alert-list">
-              {notifications.map((note, index) => (
-                <div key={index} className="alert-item">
-                  {note}
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="empty-state custom-empty glass-empty">
+            <span className="empty-icon">🔔</span>
+            <p>No notifications yet.</p>
+          </div>
         </section>
       </main>
 
+      {/* Modals for Bookings, Reporting, and Editing */}
       {isModalOpen && (
-        <BookingModal
-          onClose={() => setIsModalOpen(false)}
-          onSuccess={() => {
-            setIsModalOpen(false)
-            loadBookings()
-          }}
-          resources={resources}
-          userEmail={userEmail}
-          userName={userName}
-        />
+        <BookingModal onClose={() => setIsModalOpen(false)} onSuccess={() => { setIsModalOpen(false); loadBookings(); }} resources={resources} userEmail={userEmail} userName={userName} />
       )}
 
       {reportModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content popup-anim">
-                <ReportIncident
-                  defaultResourceId={reportResourceId}
-                  onSuccess={() => {
-                    setReportModalOpen(false)
-                    loadTickets()
-                    setTicketSuccess('Incident reported')
-                    setTimeout(() => setTicketSuccess(''), 3000)
-                  }}
-                  onClose={() => setReportModalOpen(false)}
-                />
+            <ReportIncident defaultResourceId={reportResourceId} onSuccess={() => { setReportModalOpen(false); loadTickets(); setTicketSuccess('Incident reported'); setTimeout(() => setTicketSuccess(''), 3000); }} onClose={() => setReportModalOpen(false)} />
           </div>
         </div>
       )}
 
       {editTicket && (
-        <EditIncidentModal
-          ticket={editTicket}
-          resources={resources}
-          onClose={() => setEditTicket(null)}
-          onSaved={() => {
-            loadTickets()
-            setEditTicket(null)
-          }}
-        />
+        <EditIncidentModal ticket={editTicket} resources={resources} onClose={() => setEditTicket(null)} onSaved={() => { loadTickets(); setEditTicket(null); }} />
       )}
 
       {attachmentModal.open && (
         <div className="modal-overlay" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [] })}>
-          <div className="modal-content popup-anim" onClick={(event) => event.stopPropagation()}>
-            <button className="close-btn" type="button" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [] })}>
-              &times;
-            </button>
+          <div className="modal-content popup-anim" onClick={(e) => e.stopPropagation()}>
+            <button className="close-btn" type="button" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [] })}>&times;</button>
             <h2 style={{marginTop: 0}}>Ticket Evidence</h2>
-            {attachmentModal.attachments.length === 0 ? (
-              <p className="text-muted">No attachments for this ticket.</p>
-            ) : (
-              <div className="attachment-grid">
-                {attachmentModal.attachments.map((src, index) => (
-                  <div className="attachment-card" key={`${attachmentModal.ticketId}-${index}`}>
-                    <img src={src} alt={`Attachment ${index + 1}`} />
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="attachment-grid">
+              {attachmentModal.attachments.map((src, i) => (
+                <div className="attachment-card" key={i}><img src={src} alt="Evidence" /></div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -556,37 +448,23 @@ export default function UserDashboard() {
         <div className="modal-overlay">
           <div className="modal-content popup-anim">
             <button className="close-btn" onClick={() => setCancelModalOpen(false)}>×</button>
-            <h2 style={{ margin: '0 0 8px 0' }}>Cancel Booking</h2>
-            <p className="text-muted" style={{ marginBottom: '20px', fontSize: '0.9rem' }}>Please provide a reason for cancellation.</p>
+            <h2>Cancel Booking</h2>
             <div className="form-group">
-              <label>Reason Type</label>
-              <select
-                value={cancelReason}
-                onChange={e => setCancelReason(e.target.value)}
-                required
-              >
+              <label>Reason</label>
+              <select value={cancelReason} onChange={e => setCancelReason(e.target.value)} required>
                 <option value="">Select a reason</option>
                 <option value="Schedule Conflict">Schedule Conflict</option>
                 <option value="No longer needed">No longer needed</option>
-                <option value="Booked wrong resource">Booked wrong resource</option>
                 <option value="Other">Other</option>
               </select>
             </div>
-            <button className="btn-danger full-width" style={{ marginTop: '24px' }} onClick={handleCancelConfirm}>
-              Confirm Cancellation
-            </button>
+            <button className="btn-danger full-width mt-4" onClick={handleCancelConfirm}>Confirm</button>
           </div>
         </div>
       )}
 
       {commentModal.open && (
-        <IncidentCommentsModal
-          ticketId={commentModal.ticketId}
-          ticketLabel={commentModal.ticketLabel}
-          currentEmail={userEmail}
-          currentRole={currentRole}
-          onClose={() => setCommentModal({ open: false, ticketId: '', ticketLabel: '' })}
-        />
+        <IncidentCommentsModal ticketId={commentModal.ticketId} ticketLabel={commentModal.ticketLabel} currentEmail={userEmail} currentRole={currentRole} onClose={() => setCommentModal({ open: false, ticketId: '', ticketLabel: '' })} />
       )}
     </div>
   )
