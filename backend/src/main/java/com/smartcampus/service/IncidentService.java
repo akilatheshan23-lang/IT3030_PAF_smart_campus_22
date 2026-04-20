@@ -35,18 +35,18 @@ public class IncidentService {
             "image/webp",
             "image/gif"
     );
-        private static final int MAX_COMMENT_LENGTH = 1000;
+    private static final int MAX_COMMENT_LENGTH = 1000;
 
     private final IncidentRepository incidentRepository;
     private final com.smartcampus.repository.BookingRepository bookingRepository;
-        private final NotificationService notificationService;
+    private final NotificationService notificationService;
 
-        public IncidentService(IncidentRepository incidentRepository,
-                               com.smartcampus.repository.BookingRepository bookingRepository,
-                               NotificationService notificationService) {
+    public IncidentService(IncidentRepository incidentRepository,
+                           com.smartcampus.repository.BookingRepository bookingRepository,
+                           NotificationService notificationService) {
         this.incidentRepository = incidentRepository;
         this.bookingRepository = bookingRepository;
-            this.notificationService = notificationService;
+        this.notificationService = notificationService;
     }
 
     public static final class CommentActor {

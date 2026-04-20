@@ -1,51 +1,35 @@
-package com.smartcampus.model;
+package com.smartcampus.dto;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import com.smartcampus.model.ResourceStatus;
 
-@Document(collection = "resources")
-public class Resource {
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
-    @Id
-    private String id;
+public class ResourceUpdateRequest {
+
+    @Size(max = 120, message = "Resource name must be at most 120 characters")
     private String name;
+
+    @Size(max = 80, message = "Resource type must be at most 80 characters")
     private String type;
+
+    @Positive(message = "Capacity must be positive")
     private Integer capacity;
+
+    @Size(max = 120, message = "Location must be at most 120 characters")
     private String location;
+
+    @Pattern(
+            regexp = "^(Faculty of Computing|Engineering Department|Faculty of Business|Faculty of bussiness|Architecture Department)$",
+            message = "Department must be one of the supported options"
+    )
     private String department;
+
+    @Pattern(regexp = "^\\d{2}:\\d{2}\\s-\\s\\d{2}:\\d{2}$", message = "Availability window must be in format HH:mm - HH:mm")
     private String availabilityWindow;
+
     private ResourceStatus status;
-
-    public Resource() {
-    }
-
-    public Resource(String name, String type, Integer capacity, String location, String availabilityWindow, ResourceStatus status) {
-        this(name, type, capacity, location, null, availabilityWindow, status);
-    }
-
-    public Resource(String name,
-                    String type,
-                    Integer capacity,
-                    String location,
-                    String department,
-                    String availabilityWindow,
-                    ResourceStatus status) {
-        this.name = name;
-        this.type = type;
-        this.capacity = capacity;
-        this.location = location;
-        this.department = department;
-        this.availabilityWindow = availabilityWindow;
-        this.status = status;
-    }
-
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
 
     public String getName() {
         return name;

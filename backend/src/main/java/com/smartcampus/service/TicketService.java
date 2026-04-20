@@ -65,6 +65,7 @@ public class TicketService {
                 .orElseThrow(() -> new RuntimeException("Ticket not found: " + id));
         ticket.setStatus(newStatus);
         ticket.setUpdatedAt(LocalDateTime.now());
+        
         IncidentTicket saved = ticketRepository.save(ticket);
         notifyTicketStatusChange(saved);
         return saved;

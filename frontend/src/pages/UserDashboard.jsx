@@ -2,23 +2,49 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import campusApi from '../api/campusApi'
 import BookingModal from '../components/BookingModal'
+import ReportIssueModal from '../components/ReportIssueModal'
+// Module C Components
+import ReportIncident from '../components/ReportIncident'
+import EditIncidentModal from '../components/EditIncidentModal'
+import IncidentCommentsModal from '../components/IncidentCommentsModal'
+
+const catalogueTypes = ['Lecture Hall', 'Lab', 'Meeting Room', 'Equipment', 'Other']
+const capacityPattern = /^(<=|>=|=|<|>)?\s*(\d+)$/
 
 export default function UserDashboard() {
   const [profile, setProfile] = useState({ email: '', name: '' })
   const [authLoading, setAuthLoading] = useState(true)
   const [bookings, setBookings] = useState([])
   const [resources, setResources] = useState([])
+  // Module C State Management
+  const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelBookingId, setCancelBookingId] = useState(null)
   const [cancelReason, setCancelReason] = useState('')
+  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false)
+  // Incident Reporting State
+  const [reportModalOpen, setReportModalOpen] = useState(false)
+  const [reportResourceId, setReportResourceId] = useState('')
+  const [ticketSuccess, setTicketSuccess] = useState('')
+  const [editTicket, setEditTicket] = useState(null)
+  const [attachmentModal, setAttachmentModal] = useState({ open: false, ticketId: '', attachments: [] })
+  const [deletingTicketId, setDeletingTicketId] = useState('')
+  const [commentModal, setCommentModal] = useState({ open: false, ticketId: '', ticketLabel: '' })
+  const [catalogueFilters, setCatalogueFilters] = useState({
+    type: '',
+    capacity: '',
+    location: ''
+  })
+  const [catalogueFilterError, setCatalogueFilterError] = useState('')
+  
   const navigate = useNavigate()
   const userEmail = profile.email
   const userName = profile.name
-  const tickets = []
-  const notifications = []
+  const currentRole = localStorage.getItem('smart-campus-role') || 'USER'
+  const notifications = [] // Placeholder for Module D
 
   useEffect(() => {
     const initialize = async () => {
@@ -40,7 +66,8 @@ export default function UserDashboard() {
         localStorage.setItem('smart-campus-user-name', name)
         localStorage.setItem('smart-campus-role', role)
         setProfile({ email, name: name || email })
-        await Promise.all([loadBookings(), loadResources()])
+        // Load all required modules for User
+        await Promise.all([loadBookings(), loadResources(), loadTickets()])
       } catch (err) {
         navigate('/login')
       } finally {
@@ -63,12 +90,84 @@ export default function UserDashboard() {
     }
   }
 
-  const loadResources = async () => {
+  const loadTickets = async () => {
     try {
-      const response = await campusApi.get('/resources/public')
+      const res = await campusApi.get('/incidents/user')
+      setTickets(res.data || [])
+    } catch (err) {
+      console.error('Failed to load tickets', err)
+    }
+  }
+
+  const loadResources = async (customFilters = catalogueFilters) => {
+    const normalizedType = String(customFilters.type || '').trim()
+    const normalizedLocation = String(customFilters.location || '').trim()
+    const rawCapacity = String(customFilters.capacity || '').trim()
+
+    if (rawCapacity && !capacityPattern.test(rawCapacity)) {
+      setCatalogueFilterError('Invalid capacity. Use values like 50, >50, >=50, <30, or <=30.')
+      setResources([])
+      return
+    }
+
+    try {
+      setCatalogueFilterError('')
+
+      const params = {}
+      if (normalizedType) params.type = normalizedType
+      if (normalizedLocation) params.location = normalizedLocation
+
+      if (rawCapacity) {
+        const [, operatorRaw, valueRaw] = rawCapacity.match(capacityPattern)
+        const operator = operatorRaw || '>='
+        const value = Number(valueRaw)
+        params.capacity = `${operator}${value}`
+
+        // Backward-compatible fallback for servers that only support minCapacity.
+        if (operator === '>=') {
+          params.minCapacity = value
+        } else if (operator === '>') {
+          params.minCapacity = value + 1
+        }
+      }
+
+      const response = await campusApi.get('/resources/public', { params })
       setResources(response.data)
     } catch (err) {
+      const message = err?.response?.data?.message || 'Failed to load resources.'
+      setCatalogueFilterError(message)
       console.error(err)
+    }
+  }
+
+  const handleCatalogueFilterChange = (event) => {
+    const nextFilters = {
+      ...catalogueFilters,
+      [event.target.name]: event.target.value
+    }
+    setCatalogueFilters(nextFilters)
+  }
+
+  const handleCatalogueFilterSubmit = (event) => {
+    event.preventDefault()
+    loadResources(catalogueFilters)
+  }
+
+  const handleCatalogueFilterReset = () => {
+    const resetFilters = { type: '', capacity: '', location: '' }
+    setCatalogueFilters(resetFilters)
+    loadResources(resetFilters)
+  }
+
+
+
+  const handleReportIssue = async (issueData) => {
+    try {
+      await campusApi.post('/user/tickets', issueData)
+      setIsIssueModalOpen(false)
+      loadTickets()
+    } catch (err) {
+      alert('Failed to submit issue report.')
     }
   }
 
@@ -76,6 +175,50 @@ export default function UserDashboard() {
     setCancelBookingId(bookingId)
     setCancelReason('')
     setCancelModalOpen(true)
+  }
+
+  const openReportModal = (resourceId) => {
+    setReportResourceId(resourceId || '')
+    setReportModalOpen(true)
+  }
+
+  const openCommentModal = (ticket) => {
+    if (!ticket?.id) return
+    setCommentModal({
+      open: true,
+      ticketId: ticket.id,
+      ticketLabel: getResourceName(ticket.resourceId)
+    })
+  }
+
+  const getResourceName = (resourceId) => {
+    const res = resources.find(r => r.id === resourceId)
+    return res ? res.name : resourceId
+  }
+
+  const formatTicketStatus = (status) => {
+    if (!status) return ''
+    return String(status)
+      .toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
+
+  const handleDeleteTicket = async (ticketId) => {
+    if (!ticketId) return
+    const confirmed = window.confirm('Delete this ticket? This cannot be undone.')
+    if (!confirmed) return
+
+    setDeletingTicketId(ticketId)
+    try {
+      await campusApi.delete(`/incidents/${ticketId}`)
+      await loadTickets()
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to delete ticket')
+    } finally {
+      setDeletingTicketId('')
+    }
   }
 
   const handleCancelConfirm = async () => {
@@ -87,9 +230,7 @@ export default function UserDashboard() {
 
     try {
       await campusApi.put(`/user/bookings/${cancelBookingId}/cancel`, null, {
-        params: {
-          reason: cancelReason
-        }
+        params: { reason: cancelReason }
       })
       loadBookings()
       setCancelModalOpen(false)
@@ -115,11 +256,8 @@ export default function UserDashboard() {
     b => b.status === 'APPROVED' && new Date(`${b.bookingDate}T${b.endTime}`) >= new Date()
   )
   const historyBookings = bookings
-  const topResources = resources.slice(0, 3)
 
-  if (authLoading) {
-    return null
-  }
+  if (authLoading) return null
 
   return (
     <div className="admin-layout user-layout">
@@ -167,29 +305,64 @@ export default function UserDashboard() {
           </div>
         </section>
 
+        {ticketSuccess && <div className="success-banner">{ticketSuccess}</div>}
+
         <section id="catalogue" className="user-section admin-panel-box glass-panel-soft">
           <div className="panel-top">
             <div>
-              <span className="eyebrow">Module A</span>
               <h2>Facilities & Assets Catalogue</h2>
               <p>Preview bookable spaces and equipment with key metadata.</p>
             </div>
           </div>
 
-          {topResources.length === 0 ? (
+          <form className="filter-bar resource-filter" onSubmit={handleCatalogueFilterSubmit}>
+            <select
+              name="type"
+              value={catalogueFilters.type}
+              onChange={handleCatalogueFilterChange}
+            >
+              <option value="">All Types</option>
+              {catalogueTypes.map((typeOption) => (
+                <option key={typeOption} value={typeOption}>{typeOption}</option>
+              ))}
+            </select>
+
+            <input
+              type="text"
+              name="capacity"
+              placeholder="Capacity (e.g. > 50, <= 120, 80)"
+              value={catalogueFilters.capacity}
+              onChange={handleCatalogueFilterChange}
+            />
+
+            <input
+              type="text"
+              name="location"
+              placeholder="Location (e.g. Block B)"
+              value={catalogueFilters.location}
+              onChange={handleCatalogueFilterChange}
+            />
+
+            <div className="resource-filter-actions">
+              <button type="submit" className="btn-primary">Apply</button>
+              <button type="button" className="btn-secondary" onClick={handleCatalogueFilterReset}>Reset</button>
+            </div>
+          </form>
+
+          {catalogueFilterError && <p className="error-text">{catalogueFilterError}</p>}
+
+          {resources.length === 0 ? (
             <div className="empty-state custom-empty glass-empty">
               <span className="empty-icon">🏛</span>
               <p>No resources loaded yet.</p>
             </div>
           ) : (
             <div className="resource-grid premium-grid">
-              {topResources.map(resource => (
+              {resources.map(resource => (
                 <div key={resource.id} className="resource-card">
                   <div className="resource-top">
                     <span className="badge">{resource.type}</span>
-                    <span className={`status ${String(resource.status).toLowerCase()}`}>
-                      {resource.status}
-                    </span>
+                    <span className={`status ${String(resource.status).toLowerCase()}`}>{resource.status}</span>
                   </div>
                   <h3>{resource.name}</h3>
                   <p>{resource.location}</p>
@@ -197,38 +370,90 @@ export default function UserDashboard() {
                     <span>Capacity: {resource.capacity}</span>
                     <span>{resource.availabilityWindow}</span>
                   </div>
+                  <button className="btn-secondary small-btn full-width mt-3" onClick={() => openReportModal(resource.id)}>Report Issue</button>
                 </div>
               ))}
             </div>
           )}
         </section>
 
-        <section id="upcoming" className="user-section">
-          <div className="section-header-row">
-            <h2>Upcoming Bookings</h2>
-            <span className="badge counter-badge">{upcomingBookings.length} Active</span>
+        <section id="upcoming" className="user-section" style={{ marginBottom: '40px' }}>
+          <div className="section-header-row" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: '#0f172a' }}>Upcoming Bookings</h2>
+            <span style={{ backgroundColor: '#e0e7ff', color: '#3730a3', padding: '6px 14px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '800' }}>
+              {upcomingBookings.length} Active
+            </span>
           </div>
 
           {upcomingBookings.length === 0 ? (
             <div className="empty-state custom-empty glass-empty">
               <span className="empty-icon">📭</span>
               <p>You have no upcoming approved bookings.</p>
-              <button className="btn-secondary" style={{ marginTop: '16px' }} onClick={() => setIsModalOpen(true)}>Book Something</button>
             </div>
           ) : (
-            <div className="resource-grid premium-grid">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
               {upcomingBookings.map(b => (
-                <div key={b.id} className="resource-card booking-card premium-booking accent-green">
-                  <div className="resource-top">
-                    <span className="badge resource-badge">{b.resourceName}</span>
-                    <span className="status approved dot-status">APPROVED</span>
+                <div key={b.id} style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  border: '1px solid rgba(0,0,0,0.02)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ backgroundColor: '#e0e7ff', color: '#3730a3', padding: '8px 16px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '800' }}>
+                      {b.resourceName}
+                    </span>
+                    <span style={{ backgroundColor: '#dcfce7', color: '#166534', padding: '8px 16px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '800', letterSpacing: '0.05em' }}>
+                      APPROVED
+                    </span>
                   </div>
-                  <h3 className="booking-date">{b.bookingDate}</h3>
-                  <div className="booking-time-wrap">
-                    <p>⏱ {b.startTime} - {b.endTime}</p>
+                  <h3 style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: '800', color: '#0f172a' }}>
+                    {b.bookingDate}
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.95rem', gap: '8px' }}>
+                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                    <span>{b.startTime} - {b.endTime}</span>
                   </div>
-                  <p className="purpose-text">"{b.purpose}"</p>
-                  <button className="btn-danger full-width hover-lift" onClick={() => triggerCancel(b.id)}>Cancel Booking</button>
+                  <p style={{ margin: '0 0 12px 0', color: '#64748b', fontStyle: 'italic', fontSize: '0.95rem' }}>
+                    "{b.purpose}"
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button 
+                      className="hover-lift"
+                      style={{
+                        backgroundColor: '#da292e',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 28px',
+                        fontSize: '0.95rem',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        flex: '1'
+                      }}
+                      onClick={() => triggerCancel(b.id)}
+                    >
+                      Cancel Booking
+                    </button>
+                    <button 
+                      className="btn-secondary hover-lift"
+                      style={{
+                        borderRadius: '12px',
+                        padding: '12px 28px',
+                        fontSize: '0.95rem',
+                        fontWeight: '800',
+                        flex: '1'
+                      }}
+                      onClick={() => openReportModal(b.resourceId)}
+                    >
+                      Report Issue
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -240,12 +465,9 @@ export default function UserDashboard() {
             <div>
               <span className="eyebrow">Your Activity</span>
               <h2>Booking History</h2>
-              <p>Track the status of all your past and pending requests.</p>
+              <p>Track the status of all your requests.</p>
             </div>
           </div>
-
-          {error && <p className="error-text error-banner">{error}</p>}
-
           <div className="table-wrap premium-table-wrap">
             <table className="booking-table user-table">
               <thead>
@@ -254,45 +476,28 @@ export default function UserDashboard() {
                   <th>Resource</th>
                   <th>Date & Time</th>
                   <th>Status</th>
+                  <th>Decision</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan="5" className="empty-state">
-                      <div className="loader"></div> Loading...
-                    </td>
-                  </tr>
+                  <tr><td colSpan="6" className="empty-state">Loading...</td></tr>
                 ) : historyBookings.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="empty-state">No booking history yet.</td>
-                  </tr>
+                  <tr><td colSpan="6" className="empty-state">No history yet.</td></tr>
                 ) : (
                   historyBookings.map(b => (
                     <tr key={b.id} className="table-row-hover">
                       <td className="font-mono">{b.bookingCode}</td>
                       <td className="font-semibold">{b.resourceName}</td>
-                      <td>
-                        <div className="date-time-cell">
-                          <span className="t-date">{b.bookingDate}</span>
-                          <span className="t-time text-muted" style={{ display: 'block', fontSize: '0.85rem' }}>{b.startTime} - {b.endTime}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`status ${String(b.status).toLowerCase()} pill-status`}>
-                          {b.status}
-                        </span>
-                        {b.decisionReason && (
-                          <span className="reason-tooltip premium-tooltip" title={b.decisionReason}> ℹ️</span>
-                        )}
-                      </td>
+                      <td>{b.bookingDate} ({b.startTime})</td>
+                      <td><span className={`status ${String(b.status).toLowerCase()} pill-status`}>{b.status}</span></td>
+                      <td style={{ color: '#64748b', fontSize: '0.9rem' }}>{b.decisionReason || '-'}</td>
                       <td>
                         {(b.status === 'PENDING' || b.status === 'APPROVED') && (
-                          <button className="btn-danger small-btn ghost-danger" onClick={() => triggerCancel(b.id)}>
-                            Cancel
-                          </button>
+                          <button className="btn-danger small-btn ghost-danger" onClick={() => triggerCancel(b.id)}>Cancel</button>
                         )}
+                        <button className="btn-secondary small-btn ghost ml-2" onClick={() => openReportModal(b.resourceId)}>Report</button>
                       </td>
                     </tr>
                   ))
@@ -303,12 +508,14 @@ export default function UserDashboard() {
         </section>
 
         <section id="tickets" className="user-section admin-panel-box glass-panel-soft">
-          <div className="panel-top">
+          <div className="panel-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <span className="eyebrow">Module C</span>
               <h2>Maintenance & Incident Tickets</h2>
               <p>Track incident reports for your requested resources.</p>
             </div>
+            <button className="btn-secondary auth-secondary-btn" onClick={() => setIsIssueModalOpen(true)}>
+              Report Issue
+            </button>
           </div>
 
           {tickets.length === 0 ? (
@@ -317,10 +524,32 @@ export default function UserDashboard() {
               <p>No incident tickets yet.</p>
             </div>
           ) : (
-            <div className="alert-list">
+            <div className="resource-grid premium-grid">
               {tickets.map(ticket => (
-                <div key={ticket.id} className="alert-item">
-                  {ticket.summary}
+                <div key={ticket.id} className="resource-card booking-card">
+                  <div className="resource-top">
+                    <span className="badge">{ticket.ticketCode || getResourceName(ticket.resourceId)}</span>
+                    <span className={`status ${String(ticket.status).toLowerCase()} dot-status`}>
+                      {formatTicketStatus(ticket.status) || ticket.status}
+                    </span>
+                  </div>
+                  <h3 style={{ margin: '14px 0 6px 0', fontSize: '1.05rem' }}>{ticket.category} Update</h3>
+                  <div className="resource-meta" style={{ marginTop: '4px' }}>
+                    <span style={{ fontSize: '0.85rem' }}>Priority: <strong style={{ color: ticket.priority === 'HIGH' ? 'var(--danger)' : 'inherit' }}>{ticket.priority}</strong></span>
+                    <span style={{ fontSize: '0.85rem' }}>Loc: {ticket.resourceId || ticket.location}</span>
+                  </div>
+                  <p className="purpose-text" style={{ fontSize: '0.9rem', color: 'var(--text)' }}>"{ticket.description}"</p>
+                  
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                    <button className="btn-secondary small-btn" disabled={!ticket.attachments?.length} onClick={() => setAttachmentModal({ open: true, ticketId: ticket.id, attachments: ticket.attachments || [] })}>
+                      {ticket.attachments?.length || 0} files
+                    </button>
+                    <button className="btn-secondary small-btn ghost" onClick={() => openCommentModal(ticket)}>Comments</button>
+                    {ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED' && (
+                      <button className="btn-secondary small-btn" onClick={() => setEditTicket(ticket)}>Edit</button>
+                    )}
+                    <button className="btn-danger small-btn ghost-danger" disabled={deletingTicketId === ticket.id} onClick={() => handleDeleteTicket(ticket.id)}>Delete</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -330,39 +559,52 @@ export default function UserDashboard() {
         <section id="notifications" className="user-section admin-panel-box glass-panel-soft">
           <div className="panel-top">
             <div>
-              <span className="eyebrow">Module D</span>
               <h2>Notifications</h2>
-              <p>Stay updated on booking approvals and ticket status changes.</p>
+              <p>Stay updated on booking and ticket changes.</p>
             </div>
           </div>
-
-          {notifications.length === 0 ? (
-            <div className="empty-state custom-empty glass-empty">
-              <span className="empty-icon">🔔</span>
-              <p>No notifications yet.</p>
-            </div>
-          ) : (
-            <div className="alert-list">
-              {notifications.map((note, index) => (
-                <div key={index} className="alert-item">
-                  {note}
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="empty-state custom-empty glass-empty">
+            <span className="empty-icon">🔔</span>
+            <p>No notifications yet.</p>
+          </div>
         </section>
       </main>
 
+      {/* Modals for Bookings, Reporting, and Editing */}
       {isModalOpen && (
-        <BookingModal
-          onClose={() => setIsModalOpen(false)}
-          onSuccess={() => {
-            setIsModalOpen(false)
-            loadBookings()
-          }}
-          resources={resources}
-          userEmail={userEmail}
-          userName={userName}
+        <BookingModal onClose={() => setIsModalOpen(false)} onSuccess={() => { setIsModalOpen(false); loadBookings(); }} resources={resources} userEmail={userEmail} userName={userName} />
+      )}
+
+      {reportModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content popup-anim">
+            <ReportIncident defaultResourceId={reportResourceId} onSuccess={() => { setReportModalOpen(false); loadTickets(); setTicketSuccess('Incident reported'); setTimeout(() => setTicketSuccess(''), 3000); }} onClose={() => setReportModalOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      {editTicket && (
+        <EditIncidentModal ticket={editTicket} resources={resources} onClose={() => setEditTicket(null)} onSaved={() => { loadTickets(); setEditTicket(null); }} />
+      )}
+
+      {attachmentModal.open && (
+        <div className="modal-overlay" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [] })}>
+          <div className="modal-content popup-anim" onClick={(e) => e.stopPropagation()}>
+            <button className="close-btn" type="button" onClick={() => setAttachmentModal({ open: false, ticketId: '', attachments: [] })}>&times;</button>
+            <h2 style={{marginTop: 0}}>Ticket Evidence</h2>
+            <div className="attachment-grid">
+              {attachmentModal.attachments.map((src, i) => (
+                <div className="attachment-card" key={i}><img src={src} alt="Evidence" /></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isIssueModalOpen && (
+        <ReportIssueModal
+          onClose={() => setIsIssueModalOpen(false)}
+          onSubmit={handleReportIssue}
         />
       )}
 
@@ -370,27 +612,23 @@ export default function UserDashboard() {
         <div className="modal-overlay">
           <div className="modal-content popup-anim">
             <button className="close-btn" onClick={() => setCancelModalOpen(false)}>×</button>
-            <h2 style={{ margin: '0 0 8px 0' }}>Cancel Booking</h2>
-            <p className="text-muted" style={{ marginBottom: '20px', fontSize: '0.9rem' }}>Please provide a reason for cancellation.</p>
+            <h2>Cancel Booking</h2>
             <div className="form-group">
-              <label>Reason Type</label>
-              <select
-                value={cancelReason}
-                onChange={e => setCancelReason(e.target.value)}
-                required
-              >
+              <label>Reason</label>
+              <select value={cancelReason} onChange={e => setCancelReason(e.target.value)} required>
                 <option value="">Select a reason</option>
                 <option value="Schedule Conflict">Schedule Conflict</option>
                 <option value="No longer needed">No longer needed</option>
-                <option value="Booked wrong resource">Booked wrong resource</option>
                 <option value="Other">Other</option>
               </select>
             </div>
-            <button className="btn-danger full-width" style={{ marginTop: '24px' }} onClick={handleCancelConfirm}>
-              Confirm Cancellation
-            </button>
+            <button className="btn-danger full-width mt-4" onClick={handleCancelConfirm}>Confirm</button>
           </div>
         </div>
+      )}
+
+      {commentModal.open && (
+        <IncidentCommentsModal ticketId={commentModal.ticketId} ticketLabel={commentModal.ticketLabel} currentEmail={userEmail} currentRole={currentRole} onClose={() => setCommentModal({ open: false, ticketId: '', ticketLabel: '' })} />
       )}
     </div>
   )

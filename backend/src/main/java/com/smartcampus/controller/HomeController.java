@@ -29,8 +29,9 @@ public class HomeController {
     public List<Resource> getResources(
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String location,
-            @RequestParam(required = false) Integer minCapacity
+            @RequestParam(required = false) Integer minCapacity,
+            @RequestParam(required = false) String capacity
     ) {
-        return campusService.getPublicResources(type, location, minCapacity);
+        return campusService.getPublicResources(type, location, minCapacity, capacity);
     }
 }

@@ -3,8 +3,6 @@ package com.smartcampus.service;
 import com.smartcampus.model.UserAccount;
 import com.smartcampus.model.UserRole;
 import com.smartcampus.repository.UserAccountRepository;
-import com.smartcampus.repository.TechnicianAccountRepository;
-import com.smartcampus.model.TechnicianAccount;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
@@ -15,12 +13,9 @@ import java.util.Locale;
 public class UserAccountService {
 
     private final UserAccountRepository userAccountRepository;
-    private final TechnicianAccountRepository technicianAccountRepository;
 
-    public UserAccountService(UserAccountRepository userAccountRepository,
-                              TechnicianAccountRepository technicianAccountRepository) {
+    public UserAccountService(UserAccountRepository userAccountRepository) {
         this.userAccountRepository = userAccountRepository;
-        this.technicianAccountRepository = technicianAccountRepository;
     }
 
     public UserAccount saveOrUpdateFromOAuth(OAuth2User oauthUser, UserRole desiredRole) {
@@ -28,18 +23,6 @@ public class UserAccountService {
         String name = oauthUser.getAttribute("name");
         String picture = oauthUser.getAttribute("picture");
         Instant now = Instant.now();
-
-        if (desiredRole == UserRole.ROLE_TECHNICIAN) {
-            TechnicianAccount technician = saveOrUpdateTechnician(email, name, picture, now);
-            UserAccount transientAccount = new UserAccount();
-            transientAccount.setEmail(technician.getEmail());
-            transientAccount.setName(technician.getName());
-            transientAccount.setPictureUrl(technician.getPictureUrl());
-            transientAccount.setRole(UserRole.ROLE_TECHNICIAN);
-            transientAccount.setCreatedAt(technician.getCreatedAt());
-            transientAccount.setLastLogin(technician.getLastLogin());
-            return transientAccount;
-        }
 
         UserAccount account = userAccountRepository.findByEmail(email).orElseGet(UserAccount::new);
 
@@ -57,23 +40,6 @@ public class UserAccountService {
         account.setLastLogin(now);
 
         return userAccountRepository.save(account);
-    }
-
-    private TechnicianAccount saveOrUpdateTechnician(String email, String name, String picture, Instant now) {
-        TechnicianAccount technician = technicianAccountRepository.findByEmail(email)
-                .orElseGet(TechnicianAccount::new);
-
-        boolean isNew = technician.getId() == null;
-        if (isNew) {
-            technician.setCreatedAt(now);
-        }
-
-        technician.setEmail(email);
-        technician.setName(name != null ? name : email);
-        technician.setPictureUrl(picture);
-        technician.setLastLogin(now);
-
-        return technicianAccountRepository.save(technician);
     }
 
     private String normalizeEmail(String email) {
