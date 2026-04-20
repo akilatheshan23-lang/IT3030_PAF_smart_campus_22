@@ -8,4 +8,5 @@ backend/target/
 frontend/.vite/
 .env
 backend/.env.properties
+frontend/.env.properties
 .env.properties

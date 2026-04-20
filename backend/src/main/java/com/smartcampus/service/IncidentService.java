@@ -18,6 +18,7 @@ import com.smartcampus.dto.IncidentUpdateRequest;
 import com.smartcampus.model.Incident;
 import com.smartcampus.model.IncidentComment;
 import com.smartcampus.model.IncidentStatus;
+import com.smartcampus.model.NotificationCategory;
 import com.smartcampus.model.Priority;
 import com.smartcampus.model.UserAccount;
 import com.smartcampus.repository.IncidentRepository;
@@ -34,14 +35,18 @@ public class IncidentService {
             "image/webp",
             "image/gif"
     );
-        private static final int MAX_COMMENT_LENGTH = 1000;
+    private static final int MAX_COMMENT_LENGTH = 1000;
 
     private final IncidentRepository incidentRepository;
     private final com.smartcampus.repository.BookingRepository bookingRepository;
+    private final NotificationService notificationService;
 
-    public IncidentService(IncidentRepository incidentRepository, com.smartcampus.repository.BookingRepository bookingRepository) {
+    public IncidentService(IncidentRepository incidentRepository,
+                           com.smartcampus.repository.BookingRepository bookingRepository,
+                           NotificationService notificationService) {
         this.incidentRepository = incidentRepository;
         this.bookingRepository = bookingRepository;
+        this.notificationService = notificationService;
     }
 
     public static final class CommentActor {
@@ -126,7 +131,15 @@ public class IncidentService {
         incident.setCreatedAt(Instant.now().toString());
         incident.setRequesterEmail(normalizedEmail);
 
-        return incidentRepository.save(incident);
+        Incident saved = incidentRepository.save(incident);
+        notificationService.createAdminNotification(
+            NotificationCategory.TICKET_STATUS,
+            "New incident ticket",
+            "New incident ticket reported for resource " + buildIncidentLabel(saved) + ".",
+            "INCIDENT",
+            saved.getId()
+        );
+        return saved;
     }
 
     public List<Incident> listAll() {
@@ -156,7 +169,24 @@ public class IncidentService {
         incident.setAssignedAt(Instant.now().toString());
         incident.setStatus(IncidentStatus.IN_PROGRESS);
 
-        return incidentRepository.save(incident);
+        Incident saved = incidentRepository.save(incident);
+        String technicianName = technician.getName() != null ? technician.getName() : technician.getEmail();
+        notifyIncidentStatusChange(
+            saved,
+            "Ticket in progress",
+            "Your incident ticket " + buildIncidentLabel(saved) + " is now in progress with " + technicianName + "."
+        );
+        if (technician.getEmail() != null && !technician.getEmail().isBlank()) {
+            notificationService.createNotification(
+                    technician.getEmail(),
+                    NotificationCategory.TICKET_STATUS,
+                    "New ticket assigned",
+                    "You have been assigned ticket " + buildIncidentLabel(saved) + ".",
+                    "INCIDENT",
+                    saved.getId()
+            );
+        }
+        return saved;
     }
 
     public Incident resolveTicket(String ticketId, UserAccount technician) {
@@ -174,7 +204,13 @@ public class IncidentService {
 
         incident.setStatus(IncidentStatus.RESOLVED);
         incident.setResolvedAt(Instant.now().toString());
-        return incidentRepository.save(incident);
+        Incident saved = incidentRepository.save(incident);
+        notifyIncidentStatusChange(
+            saved,
+            "Ticket resolved",
+            "Your incident ticket " + buildIncidentLabel(saved) + " was marked resolved."
+        );
+        return saved;
     }
 
     public Incident closeTicket(String ticketId) {
@@ -187,7 +223,13 @@ public class IncidentService {
 
         incident.setStatus(IncidentStatus.CLOSED);
         incident.setClosedAt(Instant.now().toString());
-        return incidentRepository.save(incident);
+        Incident saved = incidentRepository.save(incident);
+        notifyIncidentStatusChange(
+            saved,
+            "Ticket closed",
+            "Your incident ticket " + buildIncidentLabel(saved) + " has been closed."
+        );
+        return saved;
     }
 
     public Incident rejectTicket(String ticketId, String reason) {
@@ -205,7 +247,13 @@ public class IncidentService {
 
         incident.setStatus(IncidentStatus.REJECTED);
         incident.setRejectionReason(trimmedReason);
-        return incidentRepository.save(incident);
+        Incident saved = incidentRepository.save(incident);
+        notifyIncidentStatusChange(
+            saved,
+            "Ticket rejected",
+            "Your incident ticket " + buildIncidentLabel(saved) + " was rejected. Reason: " + trimmedReason + "."
+        );
+        return saved;
     }
 
     public List<Incident> listForUser(String requesterEmail) {
@@ -320,6 +368,7 @@ public class IncidentService {
         comments.add(comment);
         incident.setComments(comments);
         Incident saved = incidentRepository.save(incident);
+        notifyCommentAdded(saved, actor, comment);
         return List.copyOf(getOrCreateComments(saved));
     }
 
@@ -439,6 +488,74 @@ public class IncidentService {
             incident.setComments(comments);
         }
         return comments;
+    }
+
+    private void notifyIncidentStatusChange(Incident incident, String title, String message) {
+        if (incident == null) {
+            return;
+        }
+
+        String email = normalizeEmail(incident.getRequesterEmail());
+        if (email == null) {
+            return;
+        }
+
+        notificationService.createNotification(
+                email,
+                NotificationCategory.TICKET_STATUS,
+                title,
+                message,
+                "INCIDENT",
+                incident.getId()
+        );
+    }
+
+    private void notifyCommentAdded(Incident incident, CommentActor actor, IncidentComment comment) {
+        if (incident == null || comment == null) {
+            return;
+        }
+
+        String requesterEmail = normalizeEmail(incident.getRequesterEmail());
+        if (requesterEmail == null) {
+            return;
+        }
+
+        String actorEmail = actor != null ? normalizeEmail(actor.getEmail()) : null;
+        if (actorEmail != null && actorEmail.equalsIgnoreCase(requesterEmail)) {
+            return;
+        }
+
+        String authorName = comment.getAuthorName() != null ? comment.getAuthorName() : comment.getAuthorEmail();
+        String body = normalize(comment.getBody());
+        String snippet = body == null ? "" : (body.length() > 120 ? body.substring(0, 117) + "..." : body);
+        String title = "New ticket comment";
+        String message = "New comment from " + (authorName != null ? authorName : "a team member")
+                + " on ticket " + buildIncidentLabel(incident) + ".";
+        if (!snippet.isBlank()) {
+            message += " \"" + snippet + "\"";
+        }
+
+        notificationService.createNotification(
+                requesterEmail,
+                NotificationCategory.TICKET_COMMENT,
+                title,
+                message,
+                "INCIDENT",
+                incident.getId()
+        );
+    }
+
+    private String buildIncidentLabel(Incident incident) {
+        if (incident == null) {
+            return "Ticket";
+        }
+        if (incident.getResourceId() != null && !incident.getResourceId().isBlank()) {
+            return incident.getResourceId();
+        }
+        if (incident.getId() != null && !incident.getId().isBlank()) {
+            return incident.getId();
+        }
+        return "Ticket";
     }
 
     private String normalize(String v) {

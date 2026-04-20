@@ -2,6 +2,7 @@ package com.smartcampus.service;
 
 import com.smartcampus.dto.TicketRequest;
 import com.smartcampus.model.IncidentTicket;
+import com.smartcampus.model.NotificationCategory;
 import com.smartcampus.model.TicketStatus;
 import com.smartcampus.repository.IncidentTicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,10 +16,13 @@ import java.util.UUID;
 public class TicketService {
 
     private final IncidentTicketRepository ticketRepository;
+    private final NotificationService notificationService;
 
     @Autowired
-    public TicketService(IncidentTicketRepository ticketRepository) {
+    public TicketService(IncidentTicketRepository ticketRepository,
+                         NotificationService notificationService) {
         this.ticketRepository = ticketRepository;
+        this.notificationService = notificationService;
     }
 
     public IncidentTicket createTicket(TicketRequest request, String email, String name) {
@@ -36,7 +40,16 @@ public class TicketService {
                 name
         );
         
-        return ticketRepository.save(ticket);
+        IncidentTicket saved = ticketRepository.save(ticket);
+        String label = saved.getTicketCode() != null ? saved.getTicketCode() : saved.getId();
+        notificationService.createAdminNotification(
+            NotificationCategory.TICKET_STATUS,
+            "New maintenance ticket",
+            "New maintenance ticket " + label + " submitted.",
+            "MAINTENANCE_TICKET",
+            saved.getId()
+        );
+        return saved;
     }
 
     public List<IncidentTicket> getUserTickets(String email) {
@@ -52,6 +65,33 @@ public class TicketService {
                 .orElseThrow(() -> new RuntimeException("Ticket not found: " + id));
         ticket.setStatus(newStatus);
         ticket.setUpdatedAt(LocalDateTime.now());
-        return ticketRepository.save(ticket);
+        
+        IncidentTicket saved = ticketRepository.save(ticket);
+        notifyTicketStatusChange(saved);
+        return saved;
+    }
+
+    private void notifyTicketStatusChange(IncidentTicket ticket) {
+        if (ticket == null || ticket.getStatus() == null) {
+            return;
+        }
+
+        String email = ticket.getReporterEmail();
+        if (email == null || email.isBlank()) {
+            return;
+        }
+
+        String ticketCode = ticket.getTicketCode() != null ? ticket.getTicketCode() : ticket.getId();
+        String statusLabel = ticket.getStatus().name().toLowerCase().replace('_', ' ');
+        statusLabel = statusLabel.substring(0, 1).toUpperCase() + statusLabel.substring(1);
+
+        notificationService.createNotification(
+                email,
+                NotificationCategory.TICKET_STATUS,
+                "Ticket status updated",
+                "Your maintenance ticket " + ticketCode + " is now " + statusLabel + ".",
+                "MAINTENANCE_TICKET",
+                ticket.getId()
+        );
     }
 }
